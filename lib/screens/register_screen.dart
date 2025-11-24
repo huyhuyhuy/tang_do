@@ -19,6 +19,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
+  final _referralCodeController = TextEditingController();
   bool _isLoading = false;
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
@@ -32,6 +33,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     _emailController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
+    _referralCodeController.dispose();
     super.dispose();
   }
 
@@ -71,12 +73,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
     }
 
     final appState = context.read<AppState>();
+    final referralCode = _referralCodeController.text.trim();
     final success = await appState.register(
       phone: _phoneController.text.trim(),
       nickname: _nicknameController.text.trim(),
       password: _passwordController.text,
       name: _nameController.text.trim().isEmpty ? null : _nameController.text.trim(),
       email: _emailController.text.trim(),
+      referralCode: referralCode.isEmpty ? null : referralCode,
     );
 
     setState(() => _isLoading = false);
@@ -202,6 +206,18 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     }
                     return null;
                   },
+                ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: _referralCodeController,
+                  decoration: const InputDecoration(
+                    labelText: 'Mã giới thiệu (tùy chọn)',
+                    border: OutlineInputBorder(),
+                    prefixIcon: Icon(Icons.card_giftcard),
+                    hintText: 'Nhập số điện thoại người giới thiệu',
+                    helperText: 'Nhập mã giới thiệu để người giới thiệu nhận 100 GoldChip',
+                  ),
+                  keyboardType: TextInputType.phone,
                 ),
                 const SizedBox(height: 16),
                 TextFormField(

@@ -10,6 +10,7 @@ import '../models/product.dart';
 import '../models/user.dart';
 import '../utils/constants.dart';
 import '../utils/contact_utils.dart';
+import '../widgets/banner_ad_widget.dart';
 import 'product_detail_screen.dart';
 import 'edit_profile_screen.dart';
 import 'add_product_screen.dart';
@@ -499,6 +500,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ],
         ),
       ),
+      bottomNavigationBar: const BannerAdWidget(),
     );
   }
 }
@@ -658,7 +660,7 @@ class _ProfileProductCardState extends State<_ProfileProductCard> {
                   ],
                 ],
               ),
-            ),
+              ),
           ],
         ),
       ),

@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:flutter/services.dart';
 import '../providers/app_state.dart';
 import '../services/goldchip_service.dart';
+import '../services/auth_service.dart';
+import '../widgets/banner_ad_widget.dart';
 import '../models/goldchip_transaction.dart';
 import '../utils/constants.dart';
 
@@ -14,6 +17,7 @@ class GoldChipScreen extends StatefulWidget {
 
 class _GoldChipScreenState extends State<GoldChipScreen> {
   final GoldChipService _goldChipService = GoldChipService();
+  final AuthService _authService = AuthService();
   List<GoldChipTransaction> _transactions = [];
   bool _isLoading = true;
 
@@ -132,6 +136,114 @@ class _GoldChipScreenState extends State<GoldChipScreen> {
     }
   }
 
+  Future<void> _showReferralDialog() async {
+    final appState = context.read<AppState>();
+    if (appState.currentUser == null) return;
+
+    final referralCode = appState.currentUser!.phone;
+
+    await showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Mã giới thiệu'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Chia sẻ mã giới thiệu này với bạn bè. Bạn sẽ nhận 100 GoldChip khi họ đăng ký thành công.',
+              style: TextStyle(fontSize: 14),
+            ),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.grey[100],
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.grey[300]!),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      referralCode,
+                      style: const TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 1.5,
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.copy),
+                    onPressed: () {
+                      Clipboard.setData(ClipboardData(text: referralCode));
+                      Navigator.pop(context);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Đã sao chép mã giới thiệu'),
+                          backgroundColor: Colors.green,
+                        ),
+                      );
+                    },
+                    tooltip: 'Sao chép',
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.green[50],
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.info_outline, color: Colors.green[700], size: 20),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Bạn bè nhập mã này khi đăng ký để bạn nhận 100 GoldChip.',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.green[700],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Đóng'),
+          ),
+          ElevatedButton.icon(
+            onPressed: () {
+              Clipboard.setData(ClipboardData(text: referralCode));
+              Navigator.pop(context);
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Đã sao chép mã giới thiệu'),
+                  backgroundColor: Colors.green,
+                ),
+              );
+            },
+            icon: const Icon(Icons.copy),
+            label: const Text('Sao chép'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.green,
+              foregroundColor: Colors.white,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final appState = context.watch<AppState>();
@@ -167,13 +279,46 @@ class _GoldChipScreenState extends State<GoldChipScreen> {
                         ),
                       ),
                       const SizedBox(height: 16),
-                      ElevatedButton.icon(
-                        onPressed: _transferGoldChip,
-                        icon: const Icon(Icons.send),
-                        label: const Text('Chuyển GoldChip'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.orange,
-                          foregroundColor: Colors.white,
+                      Row(
+                        children: [
+                          Expanded(
+                            child: ElevatedButton.icon(
+                              onPressed: _transferGoldChip,
+                              icon: const Icon(Icons.send),
+                              label: const Text('Chuyển GoldChip'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.orange,
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(vertical: 16),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: ElevatedButton.icon(
+                              onPressed: _showReferralDialog,
+                              icon: const Icon(Icons.person_add),
+                              label: const Text('Giới thiệu bạn bè'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.green,
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(vertical: 16),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      const Text(
+                        'Nhận 100 GoldChip khi bạn bè đăng ký thành công',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: Colors.grey,
                         ),
                       ),
                       const SizedBox(height: 8),
@@ -273,6 +418,7 @@ class _GoldChipScreenState extends State<GoldChipScreen> {
                 ),
               ],
             ),
+      bottomNavigationBar: const BannerAdWidget(),
     );
   }
 }

@@ -696,6 +696,7 @@ CREATE TRIGGER trigger_notify_on_review
 4. Update models để sử dụng UUID
 5. Update authentication flow để sử dụng Supabase Auth
 6. Update image upload để sử dụng Supabase Storage
+7. **Giữ nguyên ads integration**: Google Mobile Ads sẽ tiếp tục hoạt động độc lập, không cần thay đổi
 
 ### Phase 5: Testing
 1. Test authentication flow
@@ -717,6 +718,7 @@ CREATE TRIGGER trigger_notify_on_review
 5. **Timestamps với timezone**: Sử dụng TIMESTAMPTZ thay vì INTEGER milliseconds
 6. **Full-text search**: Hỗ trợ tìm kiếm tiếng Việt
 7. **RLS Security**: Tất cả tables đều có RLS enabled
+8. **Ads Integration**: App hiện tại đã tích hợp Google AdMob với banner ads. Khi migrate sang Supabase, ads integration sẽ không bị ảnh hưởng vì nó hoạt động độc lập với database backend.
 
 ### Performance:
 - Indexes được tối ưu cho các query phổ biến

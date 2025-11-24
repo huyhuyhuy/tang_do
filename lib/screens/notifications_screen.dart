@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/app_state.dart';
 import '../services/notification_service.dart';
+import '../widgets/banner_ad_widget.dart';
 import '../models/notification.dart' as models;
 
 class NotificationsScreen extends StatefulWidget {
@@ -151,6 +152,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                     },
                   ),
                 ),
+      bottomNavigationBar: const BannerAdWidget(),
     );
   }
 }

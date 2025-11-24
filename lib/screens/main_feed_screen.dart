@@ -5,6 +5,7 @@ import '../services/product_service.dart';
 import '../services/notification_service.dart';
 import '../models/product.dart';
 import '../utils/constants.dart';
+import '../widgets/banner_ad_widget.dart';
 import 'product_detail_screen.dart';
 import 'profile_screen.dart';
 import 'add_product_screen.dart';
@@ -235,16 +236,20 @@ class _MainFeedScreenState extends State<MainFeedScreen> {
                   ),
                 ),
       floatingActionButton: currentUser != null
-          ? FloatingActionButton(
-              onPressed: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => const AddProductScreen()),
-                );
-              },
-              backgroundColor: Colors.orange,
-              child: const Icon(Icons.add, color: Colors.white),
+          ? Padding(
+              padding: const EdgeInsets.only(bottom: 80), // Đẩy lên cao hơn để tránh banner
+              child: FloatingActionButton(
+                onPressed: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const AddProductScreen()),
+                  );
+                },
+                backgroundColor: Colors.orange,
+                child: const Icon(Icons.add, color: Colors.white),
+              ),
             )
           : null,
+      bottomNavigationBar: const BannerAdWidget(),
     );
   }
 }

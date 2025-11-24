@@ -8,6 +8,7 @@ import '../services/notification_service.dart';
 import '../models/product.dart';
 import '../models/review.dart';
 import '../models/user.dart';
+import '../widgets/banner_ad_widget.dart';
 import 'profile_screen.dart';
 import 'add_review_screen.dart';
 
@@ -287,6 +288,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
           ],
         ),
       ),
+      bottomNavigationBar: const BannerAdWidget(),
     );
   }
 }

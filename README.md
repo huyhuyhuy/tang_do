@@ -57,6 +57,12 @@
 - Gọi điện trực tiếp từ số điện thoại trong profile
 - Copy địa chỉ vào clipboard
 
+### Quảng cáo (Ads)
+- Banner quảng cáo hiển thị ở dưới cùng tất cả các màn hình
+- Tích hợp Google AdMob (Google Mobile Ads)
+- Sử dụng test ad unit ID cho development
+- FloatingActionButton được điều chỉnh để tránh banner
+
 ## Cấu trúc dự án
 
 ```
@@ -94,6 +100,8 @@ lib/
 ├── utils/             # Constants và utilities
 │   ├── constants.dart
 │   └── contact_utils.dart
+├── widgets/           # Reusable widgets
+│   └── banner_ad_widget.dart
 └── main.dart          # Entry point
 ```
 
@@ -175,12 +183,18 @@ lib/
 flutter pub get
 ```
 
-2. Chạy app:
+2. Cấu hình AdMob (đã được cấu hình sẵn với test App ID):
+   - Android: AdMob App ID đã được thêm vào `android/app/src/main/AndroidManifest.xml`
+   - Test App ID: `ca-app-pub-3940256099942544~3347511713`
+   - Test Banner Ad Unit ID: `ca-app-pub-3940256099942544/6300978111`
+   - **Lưu ý**: Khi publish app, cần thay thế bằng App ID và Ad Unit ID thật từ AdMob Console
+
+3. Chạy app:
 ```bash
 flutter run
 ```
 
-3. Build app:
+4. Build app:
 ```bash
 # Android
 flutter build apk
@@ -210,6 +224,8 @@ App tự động seed demo data khi khởi chạy lần đầu:
   - path_provider 2.1.1 (lưu ảnh local)
   - intl 0.19.0 (format ngày tháng)
   - shared_preferences 2.2.2 (lưu preferences)
+- **Ads**:
+  - google_mobile_ads 5.0.0 (Google AdMob integration)
 
 ## Tính năng đã hoàn thành
 
@@ -223,6 +239,7 @@ App tự động seed demo data khi khởi chạy lần đầu:
 ✅ Hệ thống thông báo  
 ✅ Liên hệ (gọi điện, copy địa chỉ)  
 ✅ Seed demo data  
+✅ Banner quảng cáo (Google AdMob) tích hợp vào tất cả màn hình  
 
 ## Tương lai
 

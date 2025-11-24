@@ -41,6 +41,7 @@ class AppState extends ChangeNotifier {
     required String password,
     String? name,
     String? email,
+    String? referralCode,
   }) async {
     final user = await _authService.register(
       phone: phone,
@@ -48,6 +49,7 @@ class AppState extends ChangeNotifier {
       password: password,
       name: name,
       email: email,
+      referralCode: referralCode,
     );
     if (user != null) {
       _currentUser = user;
