@@ -1,6 +1,5 @@
 import '../database/database_helper.dart';
 import '../models/user.dart';
-import 'goldchip_service.dart';
 
 class AuthService {
   final DatabaseHelper _dbHelper = DatabaseHelper.instance;
@@ -26,7 +25,6 @@ class AuthService {
     required String password,
     String? name,
     String? email,
-    String? referralCode,
   }) async {
     final db = await _dbHelper.database;
     
@@ -43,49 +41,10 @@ class AuthService {
       );
 
       final id = await db.insert('users', user.toMap());
-      final newUser = user.copyWith(id: id);
-
-      // Check for referral code and award bonus
-      if (referralCode != null && referralCode.isNotEmpty) {
-        await _checkAndAwardReferral(referralCode, phone, id);
-      }
-
-      return newUser;
+      return user.copyWith(id: id);
     } catch (e) {
       // Handle unique constraint violation
       return null;
-    }
-  }
-
-  Future<void> _checkAndAwardReferral(String referralCode, String newUserPhone, int newUserId) async {
-    final db = await _dbHelper.database;
-    
-    // Find user with phone matching referral code
-    final referrerUsers = await db.query(
-      'users',
-      where: 'phone = ?',
-      whereArgs: [referralCode],
-      limit: 1,
-    );
-
-    if (referrerUsers.isNotEmpty) {
-      final referrerId = referrerUsers.first['id'] as int;
-      
-      // Don't award if referring to self
-      if (referrerId == newUserId) return;
-      
-      // Save referral record
-      await db.insert('referrals', {
-        'referrer_id': referrerId,
-        'referred_phone': newUserPhone,
-        'is_completed': 1,
-        'created_at': DateTime.now().millisecondsSinceEpoch,
-        'completed_at': DateTime.now().millisecondsSinceEpoch,
-      });
-      
-      // Award bonus to referrer
-      final goldChipService = GoldChipService();
-      await goldChipService.addReferralBonus(referrerId);
     }
   }
 

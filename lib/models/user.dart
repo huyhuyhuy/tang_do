@@ -1,15 +1,15 @@
 class User {
-  final int? id;
+  final String? id; // UUID from Supabase
   final String phone;
   final String nickname;
-  final String password;
+  final String password; // Stored directly in database (for testing)
   final String? name;
   final String? email;
   final String? address;
   final String? province;
   final String? district;
-  final String? avatar;
-  final int goldChip;
+  final String? ward;
+  final String? avatar; // avatar_url in Supabase
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -23,8 +23,8 @@ class User {
     this.address,
     this.province,
     this.district,
+    this.ward,
     this.avatar,
-    this.goldChip = 0,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -40,16 +40,28 @@ class User {
       'address': address,
       'province': province,
       'district': district,
-      'avatar': avatar,
-      'gold_chip': goldChip,
-      'created_at': createdAt.millisecondsSinceEpoch,
-      'updated_at': updatedAt.millisecondsSinceEpoch,
+      'ward': ward,
+      'avatar_url': avatar,
+      'created_at': createdAt.toIso8601String(),
+      'updated_at': updatedAt.toIso8601String(),
     };
   }
 
   factory User.fromMap(Map<String, dynamic> map) {
+    // Handle both Supabase (TIMESTAMPTZ) and SQLite (int) formats
+    DateTime? parseDateTime(dynamic value) {
+      if (value == null) return DateTime.now();
+      if (value is String) {
+        return DateTime.tryParse(value) ?? DateTime.now();
+      }
+      if (value is int) {
+        return DateTime.fromMillisecondsSinceEpoch(value);
+      }
+      return DateTime.now();
+    }
+    
     return User(
-      id: map['id'] as int?,
+      id: map['id']?.toString(),
       phone: map['phone'] as String,
       nickname: map['nickname'] as String,
       password: map['password'] as String,
@@ -58,15 +70,15 @@ class User {
       address: map['address'] as String?,
       province: map['province'] as String?,
       district: map['district'] as String?,
-      avatar: map['avatar'] as String?,
-      goldChip: map['gold_chip'] as int? ?? 0,
-      createdAt: DateTime.fromMillisecondsSinceEpoch(map['created_at'] as int),
-      updatedAt: DateTime.fromMillisecondsSinceEpoch(map['updated_at'] as int),
+      ward: map['ward'] as String?,
+      avatar: map['avatar_url'] as String? ?? map['avatar'] as String?,
+      createdAt: parseDateTime(map['created_at']) ?? DateTime.now(),
+      updatedAt: parseDateTime(map['updated_at']) ?? DateTime.now(),
     );
   }
 
   User copyWith({
-    int? id,
+    String? id,
     String? phone,
     String? nickname,
     String? password,
@@ -75,8 +87,8 @@ class User {
     String? address,
     String? province,
     String? district,
+    String? ward,
     String? avatar,
-    int? goldChip,
     DateTime? createdAt,
     DateTime? updatedAt,
   }) {
@@ -90,11 +102,10 @@ class User {
       address: address ?? this.address,
       province: province ?? this.province,
       district: district ?? this.district,
+      ward: ward ?? this.ward,
       avatar: avatar ?? this.avatar,
-      goldChip: goldChip ?? this.goldChip,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );
   }
 }
-

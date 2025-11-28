@@ -2,15 +2,19 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'dart:io';
 import '../providers/app_state.dart';
-import '../services/product_service.dart';
-import '../services/auth_service.dart';
-import '../services/notification_service.dart';
+import '../services/supabase_product_service.dart';
+import '../services/supabase_auth_service.dart';
+import '../services/supabase_review_service.dart';
+import '../services/supabase_notification_service.dart';
 import '../models/product.dart';
 import '../models/review.dart';
 import '../models/user.dart';
 import '../widgets/banner_ad_widget.dart';
+import '../widgets/bottom_nav_bar_widget.dart';
+import '../utils/contact_utils.dart';
 import 'profile_screen.dart';
 import 'add_review_screen.dart';
+import 'main_screen.dart';
 
 class ProductDetailScreen extends StatefulWidget {
   final Product product;
@@ -22,9 +26,9 @@ class ProductDetailScreen extends StatefulWidget {
 }
 
 class _ProductDetailScreenState extends State<ProductDetailScreen> {
-  final ProductService _productService = ProductService();
-  final AuthService _authService = AuthService();
-  final NotificationService _notificationService = NotificationService();
+  final SupabaseProductService _productService = SupabaseProductService();
+  final SupabaseAuthService _authService = SupabaseAuthService();
+  final SupabaseReviewService _reviewService = SupabaseReviewService();
   
   Product? _product;
   User? _owner;
@@ -44,8 +48,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     _product = await _productService.getProductById(widget.product.id!);
     if (_product != null) {
       _owner = await _authService.getUserById(_product!.userId);
-      _reviews = await _productService.getProductReviews(_product!.id!);
-      _averageRating = await _productService.getProductAverageRating(_product!.id!);
+      _reviews = await _reviewService.getProductReviews(_product!.id!);
+      _averageRating = await _reviewService.getProductAverageRating(_product!.id!);
     }
     
     setState(() => _isLoading = false);
@@ -117,7 +121,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                       const SizedBox(width: 8),
                       Chip(
                         label: Text(
-                          _product!.condition == 'new' ? 'Mới' : 'Đã qua sử dụng',
+                          _product!.condition == 'new' ? 'Chưa sử dụng' : 'Đã qua sử dụng',
                         ),
                       ),
                     ],
@@ -142,6 +146,28 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                       ],
                     ),
                   
+                  // Contact Phone
+                  if (_product!.contactPhone != null && _product!.contactPhone!.isNotEmpty)
+                    InkWell(
+                      onTap: () => ContactUtils.makePhoneCall(_product!.contactPhone!),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.phone, color: Colors.orange),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              _product!.contactPhone!,
+                              style: const TextStyle(
+                                color: Colors.orange,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  if (_product!.contactPhone != null && _product!.contactPhone!.isNotEmpty)
+                    const SizedBox(height: 16),
                   // Location
                   Row(
                     children: [
@@ -149,7 +175,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
-                          '${_product!.address ?? ''} ${_product!.district ?? ''} ${_product!.province ?? ''}'.trim(),
+                          '${_product!.address ?? ''} ${_product!.ward != null && _product!.ward!.isNotEmpty ? _product!.ward! + ', ' : ''}${_product!.district ?? ''} ${_product!.province ?? ''}'.trim(),
                           style: const TextStyle(color: Colors.grey),
                         ),
                       ),
@@ -288,7 +314,34 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
           ],
         ),
       ),
-      bottomNavigationBar: const BannerAdWidget(),
+      bottomNavigationBar: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          BannerAdWidget(),
+          BottomNavBarWidget(
+            currentIndex: _getCurrentTabIndex(context),
+            onDestinationSelected: (index) {
+              _navigateToTab(context, index);
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  int _getCurrentTabIndex(BuildContext context) {
+    // ProductDetailScreen được push từ MainFeedScreen, nên tab hiện tại là 0 (Trang chủ)
+    return 0;
+  }
+
+  void _navigateToTab(BuildContext context, int index) {
+    // Pop về MainScreen và switch tab
+    Navigator.of(context).popUntil((route) => route.isFirst);
+    // Navigate về MainScreen với tab được chọn
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute(
+        builder: (_) => MainScreenWithTab(initialTab: index),
+      ),
     );
   }
 }

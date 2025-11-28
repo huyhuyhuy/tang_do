@@ -2,46 +2,50 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'dart:io';
 import '../providers/app_state.dart';
-import '../services/product_service.dart';
-import '../services/auth_service.dart';
-import '../services/goldchip_service.dart';
-import '../services/notification_service.dart';
+import '../services/supabase_product_service.dart';
+import '../services/supabase_auth_service.dart';
+import '../services/supabase_review_service.dart';
+import '../services/supabase_notification_service.dart';
 import '../models/product.dart';
 import '../models/user.dart';
 import '../utils/constants.dart';
 import '../utils/contact_utils.dart';
 import '../widgets/banner_ad_widget.dart';
+import '../widgets/bottom_nav_bar_widget.dart';
 import 'product_detail_screen.dart';
 import 'edit_profile_screen.dart';
 import 'add_product_screen.dart';
 import 'edit_product_screen.dart';
-import 'goldchip_screen.dart';
 import 'login_screen.dart';
+import 'main_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
-  final int userId;
+  final String userId;
   final bool isOwnProfile;
+  final bool showBottomNavBar;
 
   const ProfileScreen({
     super.key,
     required this.userId,
     this.isOwnProfile = false,
+    this.showBottomNavBar = true,
   });
 
   @override
   State<ProfileScreen> createState() => _ProfileScreenState();
 }
 
-class _ProfileScreenState extends State<ProfileScreen> {
-  final ProductService _productService = ProductService();
-  final AuthService _authService = AuthService();
-  final GoldChipService _goldChipService = GoldChipService();
-  final NotificationService _notificationService = NotificationService();
+class _ProfileScreenState extends State<ProfileScreen> with AutomaticKeepAliveClientMixin {
+  final SupabaseProductService _productService = SupabaseProductService();
+  final SupabaseAuthService _authService = SupabaseAuthService();
 
   User? _user;
   List<Product> _products = [];
   bool _isLoading = true;
   String _selectedCategory = 'Tất cả';
+
+  @override
+  bool get wantKeepAlive => true;
 
   @override
   void initState() {
@@ -60,113 +64,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     setState(() => _isLoading = false);
   }
 
-  Future<void> _showGiveGoldChipDialog() async {
-    final amountController = TextEditingController();
-    final descriptionController = TextEditingController();
-
-    final result = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Tặng GoldChip'),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: amountController,
-                decoration: const InputDecoration(
-                  labelText: 'Số lượng GoldChip',
-                  border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.account_balance_wallet),
-                ),
-                keyboardType: TextInputType.number,
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: descriptionController,
-                decoration: const InputDecoration(
-                  labelText: 'Lời nhắn (tùy chọn)',
-                  border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.message),
-                ),
-                maxLines: 2,
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Hủy'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.orange,
-              foregroundColor: Colors.white,
-            ),
-            child: const Text('Tặng'),
-          ),
-        ],
-      ),
-    );
-
-    if (result == true && _user != null) {
-      final appState = context.read<AppState>();
-      if (appState.currentUser == null) return;
-
-      final amount = int.tryParse(amountController.text);
-      if (amount == null || amount <= 0) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Số lượng không hợp lệ'),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
-        return;
-      }
-
-      final success = await _goldChipService.transferGoldChip(
-        fromUserId: appState.currentUser!.id!,
-        toUserId: _user!.id!,
-        amount: amount,
-        description: descriptionController.text.trim().isEmpty
-            ? null
-            : descriptionController.text.trim(),
-      );
-
-      if (success) {
-        // Create notification for receiver
-        await _notificationService.createGoldChipReceivedNotification(
-          userId: _user!.id!,
-          fromUserId: appState.currentUser!.id!,
-          amount: amount,
-          fromUserNickname: appState.currentUser!.nickname,
-        );
-
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Đã tặng $amount GoldChip cho ${_user!.nickname}'),
-            ),
-          );
-        }
-        await appState.refreshUser();
-      } else {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Tặng GoldChip thất bại'),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
-      }
-    }
-  }
-
   List<Product> get _filteredProducts {
     if (_selectedCategory == 'Tất cả') return _products;
     return _products.where((p) => p.category == _selectedCategory).toList();
@@ -174,6 +71,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
+    super.build(context); // Required for AutomaticKeepAliveClientMixin
     final appState = context.watch<AppState>();
     final isOwnProfile = widget.isOwnProfile ||
         (appState.currentUser?.id == widget.userId);
@@ -198,20 +96,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         builder: (_) => EditProfileScreen(user: _user!),
                       ),
                     );
-                    if (result == true) {
+                    if (result == true && mounted) {
+                      // Refresh AppState first to update currentUser
+                      await appState.refreshUser();
+                      // Then reload profile data
                       _loadData();
-                      appState.refreshUser();
                     }
-                  },
-                ),
-                IconButton(
-                  icon: const Icon(Icons.account_balance_wallet),
-                  onPressed: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => const GoldChipScreen(),
-                      ),
-                    );
                   },
                 ),
                 PopupMenuButton<String>(
@@ -323,21 +213,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         ),
                       ],
                     ),
-                    if (!isOwnProfile) ...[
-                      const SizedBox(height: 16),
-                      SizedBox(
-                        width: double.infinity,
-                        child: ElevatedButton(
-                          onPressed: _showGiveGoldChipDialog,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.orange,
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(vertical: 12),
-                          ),
-                          child: const Text('Tặng GoldChip'),
-                        ),
-                      ),
-                    ],
                     const Divider(height: 24),
                     // Contact info - compact
                     _CompactInfoRow(
@@ -500,7 +375,36 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ],
         ),
       ),
-      bottomNavigationBar: const BannerAdWidget(),
+      bottomNavigationBar: widget.showBottomNavBar
+          ? Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                BannerAdWidget(),
+                BottomNavBarWidget(
+                  currentIndex: _getCurrentTabIndex(context),
+                  onDestinationSelected: (index) {
+                    _navigateToTab(context, index);
+                  },
+                ),
+              ],
+            )
+          : null,
+    );
+  }
+
+  int _getCurrentTabIndex(BuildContext context) {
+    // ProfileScreen được push từ MainFeedScreen hoặc từ tab Profile, nên tab hiện tại là 3 (Hồ sơ)
+    return 3;
+  }
+
+  void _navigateToTab(BuildContext context, int index) {
+    // Pop về MainScreen và switch tab
+    Navigator.of(context).popUntil((route) => route.isFirst);
+    // Navigate về MainScreen với tab được chọn
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute(
+        builder: (_) => MainScreenWithTab(initialTab: index),
+      ),
     );
   }
 }
@@ -561,8 +465,8 @@ class _ProfileProductCardState extends State<_ProfileProductCard> {
   }
 
   Future<void> _loadRating() async {
-    final productService = ProductService();
-    final rating = await productService.getProductAverageRating(widget.product.id!);
+    final reviewService = SupabaseReviewService();
+    final rating = await reviewService.getProductAverageRating(widget.product.id!);
     setState(() {
       _averageRating = rating > 0 ? rating : null;
       _isLoadingRating = false;
@@ -583,16 +487,27 @@ class _ProfileProductCardState extends State<_ProfileProductCard> {
                 children: [
                   widget.product.mainImage != null &&
                           widget.product.mainImage!.isNotEmpty
-                      ? Image.network(
-                          widget.product.mainImage!,
-                          fit: BoxFit.cover,
-                          width: double.infinity,
-                          height: double.infinity,
-                          errorBuilder: (context, error, stackTrace) => Container(
-                            color: Colors.grey[300],
-                            child: const Icon(Icons.image, size: 48),
-                          ),
-                        )
+                      ? (widget.product.mainImage!.startsWith('http')
+                          ? Image.network(
+                              widget.product.mainImage!,
+                              fit: BoxFit.cover,
+                              width: double.infinity,
+                              height: double.infinity,
+                              errorBuilder: (context, error, stackTrace) => Container(
+                                color: Colors.grey[300],
+                                child: const Icon(Icons.image, size: 48),
+                              ),
+                            )
+                          : Image.file(
+                              File(widget.product.mainImage!),
+                              fit: BoxFit.cover,
+                              width: double.infinity,
+                              height: double.infinity,
+                              errorBuilder: (context, error, stackTrace) => Container(
+                                color: Colors.grey[300],
+                                child: const Icon(Icons.image, size: 48),
+                              ),
+                            ))
                       : Container(
                           color: Colors.grey[300],
                           child: const Icon(Icons.image, size: 48),
@@ -624,6 +539,49 @@ class _ProfileProductCardState extends State<_ProfileProductCard> {
                         ),
                       ),
                     ),
+                  if (widget.isOwnProfile)
+                    Positioned(
+                      right: 8,
+                      bottom: 8,
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(
+                            width: 28,
+                            height: 28,
+                            decoration: BoxDecoration(
+                              color: Colors.grey.withOpacity(0.7),
+                              shape: BoxShape.circle,
+                            ),
+                            child: IconButton(
+                              icon: const Icon(Icons.edit, size: 16, color: Colors.white),
+                              onPressed: () {
+                                widget.onEdit?.call();
+                              },
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(),
+                            ),
+                          ),
+                          const SizedBox(width: 4),
+                          Container(
+                            width: 28,
+                            height: 28,
+                            decoration: BoxDecoration(
+                              color: Colors.grey.withOpacity(0.7),
+                              shape: BoxShape.circle,
+                            ),
+                            child: IconButton(
+                              icon: const Icon(Icons.delete, size: 16, color: Colors.white),
+                              onPressed: () {
+                                widget.onDelete?.call();
+                              },
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                 ],
               ),
             ),
@@ -641,23 +599,6 @@ class _ProfileProductCardState extends State<_ProfileProductCard> {
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                   ),
-                  if (widget.isOwnProfile) ...[
-                    const SizedBox(height: 4),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        IconButton(
-                          icon: const Icon(Icons.edit, size: 18),
-                          onPressed: widget.onEdit,
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.delete, size: 18),
-                          color: Colors.red,
-                          onPressed: widget.onDelete,
-                        ),
-                      ],
-                    ),
-                  ],
                 ],
               ),
               ),
@@ -770,5 +711,3 @@ class _InfoRow extends StatelessWidget {
     );
   }
 }
-
-

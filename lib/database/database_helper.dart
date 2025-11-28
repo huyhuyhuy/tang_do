@@ -19,7 +19,7 @@ class DatabaseHelper {
 
     return await openDatabase(
       path,
-      version: 2,
+      version: 4,
       onCreate: _createDB,
       onUpgrade: _onUpgrade,
     );
@@ -39,7 +39,6 @@ class DatabaseHelper {
         province TEXT,
         district TEXT,
         avatar TEXT,
-        gold_chip INTEGER DEFAULT 0,
         created_at INTEGER NOT NULL,
         updated_at INTEGER NOT NULL
       )
@@ -57,6 +56,8 @@ class DatabaseHelper {
         address TEXT,
         province TEXT,
         district TEXT,
+        ward TEXT,
+        contact_phone TEXT,
         image1 TEXT,
         image2 TEXT,
         image3 TEXT,
@@ -97,33 +98,6 @@ class DatabaseHelper {
       )
     ''');
 
-    // GoldChip transactions table
-    await db.execute('''
-      CREATE TABLE goldchip_transactions (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        from_user_id INTEGER,
-        to_user_id INTEGER NOT NULL,
-        amount INTEGER NOT NULL,
-        type TEXT NOT NULL,
-        description TEXT,
-        created_at INTEGER NOT NULL,
-        FOREIGN KEY (from_user_id) REFERENCES users (id) ON DELETE SET NULL,
-        FOREIGN KEY (to_user_id) REFERENCES users (id) ON DELETE CASCADE
-      )
-    ''');
-
-    // Referrals table
-    await db.execute('''
-      CREATE TABLE referrals (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        referrer_id INTEGER NOT NULL,
-        referred_phone TEXT NOT NULL,
-        is_completed INTEGER DEFAULT 0,
-        created_at INTEGER NOT NULL,
-        completed_at INTEGER,
-        FOREIGN KEY (referrer_id) REFERENCES users (id) ON DELETE CASCADE
-      )
-    ''');
 
     // Notifications table
     await db.execute('''
@@ -155,6 +129,56 @@ class DatabaseHelper {
     if (oldVersion < 2) {
       // Add avatar column to users table
       await db.execute('ALTER TABLE users ADD COLUMN avatar TEXT');
+    }
+    if (oldVersion < 3) {
+      // Add contact_phone to products table
+      await db.execute('ALTER TABLE products ADD COLUMN contact_phone TEXT');
+      
+      // Drop goldchip_transactions table if exists
+      try {
+        await db.execute('DROP TABLE IF EXISTS goldchip_transactions');
+      } catch (e) {
+        // Ignore if table doesn't exist
+      }
+      
+      // Drop referrals table if exists
+      try {
+        await db.execute('DROP TABLE IF EXISTS referrals');
+      } catch (e) {
+        // Ignore if table doesn't exist
+      }
+      
+      // Remove gold_chip column from users table
+      // SQLite doesn't support DROP COLUMN directly, so we need to recreate the table
+      await db.execute('''
+        CREATE TABLE users_new (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          phone TEXT UNIQUE NOT NULL,
+          nickname TEXT UNIQUE NOT NULL,
+          password TEXT NOT NULL,
+          name TEXT,
+          email TEXT,
+          address TEXT,
+          province TEXT,
+          district TEXT,
+          avatar TEXT,
+          created_at INTEGER NOT NULL,
+          updated_at INTEGER NOT NULL
+        )
+      ''');
+      
+      await db.execute('''
+        INSERT INTO users_new (id, phone, nickname, password, name, email, address, province, district, avatar, created_at, updated_at)
+        SELECT id, phone, nickname, password, name, email, address, province, district, avatar, created_at, updated_at
+        FROM users
+      ''');
+      
+      await db.execute('DROP TABLE users');
+      await db.execute('ALTER TABLE users_new RENAME TO users');
+    }
+    if (oldVersion < 4) {
+      // Add ward column to products table
+      await db.execute('ALTER TABLE products ADD COLUMN ward TEXT');
     }
   }
 

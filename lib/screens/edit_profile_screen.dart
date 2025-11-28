@@ -4,7 +4,10 @@ import 'dart:io';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as path;
 import '../models/user.dart';
-import '../services/auth_service.dart';
+import '../services/supabase_auth_service.dart';
+import '../utils/vietnam_addresses.dart';
+import '../providers/app_state.dart';
+import 'package:provider/provider.dart';
 
 class EditProfileScreen extends StatefulWidget {
   final User user;
@@ -21,12 +24,17 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   final _nameController = TextEditingController();
   final _emailController = TextEditingController();
   final _addressController = TextEditingController();
-  final _provinceController = TextEditingController();
-  final _districtController = TextEditingController();
-  final AuthService _authService = AuthService();
+  final _districtTextController = TextEditingController();
+  final _wardTextController = TextEditingController();
+  final SupabaseAuthService _authService = SupabaseAuthService();
   final ImagePicker _imagePicker = ImagePicker();
   File? _avatarFile;
   bool _isLoading = false;
+
+  // Address selection
+  String? _selectedProvince;
+  String? _selectedDistrict;
+  String? _selectedWard;
 
   @override
   void initState() {
@@ -35,8 +43,18 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     _nameController.text = widget.user.name ?? '';
     _emailController.text = widget.user.email ?? '';
     _addressController.text = widget.user.address ?? '';
-    _provinceController.text = widget.user.province ?? '';
-    _districtController.text = widget.user.district ?? '';
+    _selectedProvince = widget.user.province;
+    _selectedDistrict = widget.user.district;
+    _selectedWard = widget.user.ward;
+    
+    // If district/ward not in dropdown, use text controllers
+    if (_selectedDistrict != null && _selectedProvince != null && !VietnamAddresses.getDistrictsByProvince(_selectedProvince!).contains(_selectedDistrict)) {
+      _districtTextController.text = _selectedDistrict!;
+    }
+    if (_selectedWard != null && _selectedDistrict != null && !VietnamAddresses.getWardsByDistrict(_selectedDistrict!).contains(_selectedWard)) {
+      _wardTextController.text = _selectedWard!;
+    }
+    
     if (widget.user.avatar != null && widget.user.avatar!.isNotEmpty) {
       _avatarFile = File(widget.user.avatar!);
     }
@@ -91,8 +109,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     _nameController.dispose();
     _emailController.dispose();
     _addressController.dispose();
-    _provinceController.dispose();
-    _districtController.dispose();
+    _districtTextController.dispose();
+    _wardTextController.dispose();
     super.dispose();
   }
 
@@ -100,6 +118,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     if (!_formKey.currentState!.validate()) return;
 
     setState(() => _isLoading = true);
+
+    // Determine final district and ward values
+    final finalDistrict = _selectedDistrict ?? _districtTextController.text.trim();
+    final finalWard = _selectedWard ?? _wardTextController.text.trim();
 
     // Don't update nickname and phone - they are used for login
     final updatedUser = widget.user.copyWith(
@@ -112,12 +134,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       address: _addressController.text.trim().isEmpty
           ? null
           : _addressController.text.trim(),
-      province: _provinceController.text.trim().isEmpty
-          ? null
-          : _provinceController.text.trim(),
-      district: _districtController.text.trim().isEmpty
-          ? null
-          : _districtController.text.trim(),
+      province: _selectedProvince,
+      district: finalDistrict.isEmpty ? null : finalDistrict,
+      ward: finalWard.isEmpty ? null : finalWard,
       avatar: _avatarFile?.path,
     );
 
@@ -125,6 +144,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     setState(() => _isLoading = false);
 
     if (success && mounted) {
+      // Refresh user in AppState
+      final appState = context.read<AppState>();
+      await appState.refreshUser();
+      
       Navigator.of(context).pop(true);
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Đã cập nhật hồ sơ')),
@@ -215,7 +238,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                   labelText: 'Nickname',
                   border: OutlineInputBorder(),
                   prefixIcon: Icon(Icons.alternate_email),
-                  helperText: 'Nickname không thể thay đổi',
                 ),
               ),
               const SizedBox(height: 16),
@@ -228,7 +250,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                     labelText: 'Số điện thoại',
                     border: OutlineInputBorder(),
                     prefixIcon: Icon(Icons.phone),
-                    helperText: 'Số điện thoại không thể thay đổi',
                   ),
                 ),
               if (widget.user.phone != null) const SizedBox(height: 16),
@@ -260,23 +281,113 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 ),
               ),
               const SizedBox(height: 16),
-              TextFormField(
-                controller: _districtController,
-                decoration: const InputDecoration(
-                  labelText: 'Quận/Huyện',
-                  border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.location_city),
-                ),
-              ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _provinceController,
+              // Province dropdown
+              DropdownButtonFormField<String>(
+                // ignore: deprecated_member_use
+                value: _selectedProvince,
                 decoration: const InputDecoration(
                   labelText: 'Tỉnh/Thành phố',
                   border: OutlineInputBorder(),
                   prefixIcon: Icon(Icons.map),
                 ),
+                items: [
+                  const DropdownMenuItem<String>(
+                    value: null,
+                    child: Text('Chọn Tỉnh/Thành phố'),
+                  ),
+                  ...VietnamAddresses.provinces.toSet().toList().map((province) {
+                    return DropdownMenuItem<String>(
+                      value: province,
+                      child: Text(province),
+                    );
+                  }),
+                ],
+                onChanged: (value) {
+                  setState(() {
+                    _selectedProvince = value;
+                    _selectedDistrict = null;
+                    _selectedWard = null;
+                    _districtTextController.clear();
+                    _wardTextController.clear();
+                  });
+                },
               ),
+              const SizedBox(height: 16),
+              // District dropdown or text field
+              _selectedProvince != null && VietnamAddresses.getDistrictsByProvince(_selectedProvince!).isNotEmpty
+                  ? DropdownButtonFormField<String>(
+                      // ignore: deprecated_member_use
+                      value: _selectedDistrict,
+                      decoration: const InputDecoration(
+                        labelText: 'Quận/Huyện',
+                        border: OutlineInputBorder(),
+                        prefixIcon: Icon(Icons.location_city),
+                      ),
+                      items: [
+                        const DropdownMenuItem<String>(
+                          value: null,
+                          child: Text('Chọn Quận/Huyện'),
+                        ),
+                        ...VietnamAddresses.getDistrictsByProvince(_selectedProvince!).toSet().toList().map((district) {
+                          return DropdownMenuItem<String>(
+                            value: district,
+                            child: Text(district),
+                          );
+                        }),
+                      ],
+                      onChanged: (value) {
+                        setState(() {
+                          _selectedDistrict = value;
+                          _selectedWard = null;
+                          _wardTextController.clear();
+                        });
+                      },
+                    )
+                  : TextFormField(
+                      controller: _districtTextController,
+                      decoration: const InputDecoration(
+                        labelText: 'Quận/Huyện',
+                        border: OutlineInputBorder(),
+                        prefixIcon: Icon(Icons.location_city),
+                      ),
+                    ),
+              const SizedBox(height: 16),
+              // Ward dropdown or text field
+              _selectedDistrict != null && VietnamAddresses.getWardsByDistrict(_selectedDistrict!).isNotEmpty
+                  ? DropdownButtonFormField<String>(
+                      // ignore: deprecated_member_use
+                      value: _selectedWard,
+                      decoration: const InputDecoration(
+                        labelText: 'Phường/Xã',
+                        border: OutlineInputBorder(),
+                        prefixIcon: Icon(Icons.location_on),
+                      ),
+                      items: [
+                        const DropdownMenuItem<String>(
+                          value: null,
+                          child: Text('Chọn Phường/Xã'),
+                        ),
+                        ...VietnamAddresses.getWardsByDistrict(_selectedDistrict!).toSet().toList().map((ward) {
+                          return DropdownMenuItem<String>(
+                            value: ward,
+                            child: Text(ward),
+                          );
+                        }),
+                      ],
+                      onChanged: (value) {
+                        setState(() {
+                          _selectedWard = value;
+                        });
+                      },
+                    )
+                  : TextFormField(
+                      controller: _wardTextController,
+                      decoration: const InputDecoration(
+                        labelText: 'Phường/Xã',
+                        border: OutlineInputBorder(),
+                        prefixIcon: Icon(Icons.location_on),
+                      ),
+                    ),
               const SizedBox(height: 32),
               ElevatedButton(
                 onPressed: _isLoading ? null : _saveProfile,
@@ -303,4 +414,3 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     );
   }
 }
-

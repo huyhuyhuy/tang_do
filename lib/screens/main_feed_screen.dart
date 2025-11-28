@@ -1,41 +1,70 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'dart:io';
 import '../providers/app_state.dart';
-import '../services/product_service.dart';
-import '../services/notification_service.dart';
+import '../services/supabase_product_service.dart';
+import '../services/supabase_notification_service.dart';
+import '../services/supabase_review_service.dart';
 import '../models/product.dart';
 import '../utils/constants.dart';
+import '../utils/vietnam_addresses.dart';
 import '../widgets/banner_ad_widget.dart';
 import 'product_detail_screen.dart';
-import 'profile_screen.dart';
-import 'add_product_screen.dart';
-import 'notifications_screen.dart';
 
 class MainFeedScreen extends StatefulWidget {
   const MainFeedScreen({super.key});
 
   @override
-  State<MainFeedScreen> createState() => _MainFeedScreenState();
+  State<MainFeedScreen> createState() => MainFeedScreenState();
 }
 
-class _MainFeedScreenState extends State<MainFeedScreen> {
-  final ProductService _productService = ProductService();
-  final NotificationService _notificationService = NotificationService();
+class MainFeedScreenState extends State<MainFeedScreen> with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
+  
+  void resetSearch() {
+    setState(() {
+      _searchQuery = '';
+      _searchController.clear();
+      _selectedCategory = null;
+      _selectedProvince = null;
+      _selectedDistrict = null;
+      _selectedWard = null;
+      _selectedCondition = null;
+    });
+    _loadProducts();
+  }
+  final SupabaseProductService _productService = SupabaseProductService();
+  final SupabaseNotificationService _notificationService = SupabaseNotificationService();
   List<Product> _filteredProducts = [];
   bool _isLoading = true;
   String _searchQuery = '';
   String? _selectedCategory;
   String? _selectedProvince;
-  int? _minRating;
+  String? _selectedDistrict;
+  String? _selectedWard;
+  String? _selectedCondition;
   int _unreadNotificationCount = 0;
+  final TextEditingController _searchController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
     _loadProducts();
     _loadNotificationCount();
-    // Delete expired products on startup
-    _productService.deleteExpiredProducts();
+    // Note: Expired products are filtered by expires_at in query, no need to delete
+    _searchController.addListener(() {
+      if (_searchController.text != _searchQuery) {
+        setState(() => _searchQuery = _searchController.text);
+        _applyFilters();
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadNotificationCount() async {
@@ -56,7 +85,9 @@ class _MainFeedScreenState extends State<MainFeedScreen> {
       final products = await _productService.getAllActiveProducts(
         category: _selectedCategory,
         province: _selectedProvince,
-        minRating: _minRating,
+        district: _selectedDistrict,
+        ward: _selectedWard,
+        condition: _selectedCondition,
         searchQuery: _searchQuery.isEmpty ? null : _searchQuery,
       );
       setState(() {
@@ -75,112 +106,100 @@ class _MainFeedScreenState extends State<MainFeedScreen> {
   void _showFilterDialog() {
     showModalBottomSheet(
       context: context,
-      builder: (context) => _FilterBottomSheet(
-        selectedCategory: _selectedCategory,
-        selectedProvince: _selectedProvince,
-        minRating: _minRating,
-        onApply: (category, province, rating) {
-          setState(() {
-            _selectedCategory = category;
-            _selectedProvince = province;
-            _minRating = rating;
-          });
-          _applyFilters();
-        },
+      isScrollControlled: true,
+      builder: (context) => DraggableScrollableSheet(
+        initialChildSize: 0.9,
+        minChildSize: 0.5,
+        maxChildSize: 0.95,
+        builder: (context, scrollController) => _FilterBottomSheet(
+          selectedCategory: _selectedCategory,
+          selectedProvince: _selectedProvince,
+          selectedDistrict: _selectedDistrict,
+          selectedWard: _selectedWard,
+          selectedCondition: _selectedCondition,
+          onApply: (category, province, district, ward, condition) {
+            setState(() {
+              _selectedCategory = category;
+              _selectedProvince = province;
+              _selectedDistrict = district;
+              _selectedWard = ward;
+              _selectedCondition = condition;
+            });
+            _applyFilters();
+          },
+          scrollController: scrollController,
+        ),
       ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
+    super.build(context); // Required for AutomaticKeepAliveClientMixin
     final appState = context.watch<AppState>();
     final currentUser = appState.currentUser;
 
-    return Scaffold(
+    return WillPopScope(
+      onWillPop: () async {
+        if (_searchQuery.isNotEmpty || _selectedCategory != null || _selectedProvince != null || _selectedDistrict != null || _selectedWard != null || _selectedCondition != null) {
+          resetSearch();
+          return false; // Prevent default back behavior
+        }
+        return true;
+      },
+      child: Scaffold(
       appBar: AppBar(
+        automaticallyImplyLeading: false,
         title: const Text(
           'Tặng đồ',
           style: TextStyle(fontWeight: FontWeight.bold),
         ),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.search, color: Colors.black),
-            onPressed: () {
-              showDialog(
-                context: context,
-                builder: (context) => AlertDialog(
-                  title: const Text('Tìm kiếm'),
-                  content: TextField(
-                    autofocus: true,
-                    decoration: const InputDecoration(
-                      hintText: 'Nhập từ khóa...',
-                      border: OutlineInputBorder(),
-                    ),
-                    onSubmitted: (value) {
-                      setState(() => _searchQuery = value);
-                      _applyFilters();
-                      Navigator.pop(context);
-                    },
+          // Search bar - thu nhỏ, đứng trước nút lọc
+          Container(
+            width: MediaQuery.of(context).size.width * 0.5, // Không quá 1/2 màn hình
+            margin: const EdgeInsets.symmetric(vertical: 10.0, horizontal: 8.0),
+            child: TextField(
+              controller: _searchController,
+              decoration: InputDecoration(
+                hintText: 'Search...',
+                hintStyle: TextStyle(color: Theme.of(context).brightness == Brightness.dark ? Colors.white70 : Colors.black54),
+                prefixIcon: Icon(Icons.search, color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black54, size: 18),
+                filled: true,
+                fillColor: Colors.transparent,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(30),
+                  borderSide: BorderSide(
+                    color: Theme.of(context).brightness == Brightness.dark ? Colors.white70 : Colors.black54,
+                    width: 1.0,
                   ),
                 ),
-              );
-            },
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(30),
+                  borderSide: BorderSide(
+                    color: Theme.of(context).brightness == Brightness.dark ? Colors.white70 : Colors.black54,
+                    width: 1.0,
+                  ),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(30),
+                  borderSide: BorderSide(
+                    color: Theme.of(context).brightness == Brightness.dark ? Colors.white70 : Colors.black54,
+                    width: 1.0,
+                  ),
+                ),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                isDense: true,
+              ),
+              style: TextStyle(
+                color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black87,
+                fontSize: 13,
+              ),
+            ),
           ),
           IconButton(
             icon: const Icon(Icons.filter_list, color: Colors.black),
             onPressed: _showFilterDialog,
-          ),
-          Stack(
-            children: [
-              IconButton(
-                icon: const Icon(Icons.notifications_outlined, color: Colors.black),
-                onPressed: () async {
-                  await Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => const NotificationsScreen(),
-                    ),
-                  );
-                  _loadNotificationCount();
-                },
-              ),
-              if (_unreadNotificationCount > 0)
-                Positioned(
-                  right: 8,
-                  top: 8,
-                  child: Container(
-                    padding: const EdgeInsets.all(4),
-                    decoration: const BoxDecoration(
-                      color: Colors.red,
-                      shape: BoxShape.circle,
-                    ),
-                    constraints: const BoxConstraints(
-                      minWidth: 16,
-                      minHeight: 16,
-                    ),
-                    child: Text(
-                      _unreadNotificationCount > 99 ? '99+' : '$_unreadNotificationCount',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 10,
-                        fontWeight: FontWeight.bold,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                  ),
-                ),
-            ],
-          ),
-          IconButton(
-            icon: const Icon(Icons.person_outline, color: Colors.black),
-            onPressed: () {
-              if (currentUser != null) {
-                Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => ProfileScreen(userId: currentUser.id!),
-                  ),
-                ).then((_) => _loadNotificationCount());
-              }
-            },
           ),
         ],
       ),
@@ -235,21 +254,7 @@ class _MainFeedScreenState extends State<MainFeedScreen> {
                     },
                   ),
                 ),
-      floatingActionButton: currentUser != null
-          ? Padding(
-              padding: const EdgeInsets.only(bottom: 80), // Đẩy lên cao hơn để tránh banner
-              child: FloatingActionButton(
-                onPressed: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(builder: (_) => const AddProductScreen()),
-                  );
-                },
-                backgroundColor: Colors.orange,
-                child: const Icon(Icons.add, color: Colors.white),
-              ),
-            )
-          : null,
-      bottomNavigationBar: const BannerAdWidget(),
+      ),
     );
   }
 }
@@ -278,8 +283,8 @@ class _ProductCardState extends State<_ProductCard> {
   }
 
   Future<void> _loadRating() async {
-    final productService = ProductService();
-    final rating = await productService.getProductAverageRating(widget.product.id!);
+    final reviewService = SupabaseReviewService();
+    final rating = await reviewService.getProductAverageRating(widget.product.id!);
     setState(() {
       _averageRating = rating > 0 ? rating : null;
       _isLoadingRating = false;
@@ -299,16 +304,27 @@ class _ProductCardState extends State<_ProductCard> {
               child: Stack(
                 children: [
                   widget.product.mainImage != null && widget.product.mainImage!.isNotEmpty
-                      ? Image.network(
-                          widget.product.mainImage!,
-                          fit: BoxFit.cover,
-                          width: double.infinity,
-                          height: double.infinity,
-                          errorBuilder: (context, error, stackTrace) => Container(
-                            color: Colors.grey[300],
-                            child: const Icon(Icons.image, size: 48),
-                          ),
-                        )
+                      ? (widget.product.mainImage!.startsWith('http')
+                          ? Image.network(
+                              widget.product.mainImage!,
+                              fit: BoxFit.cover,
+                              width: double.infinity,
+                              height: double.infinity,
+                              errorBuilder: (context, error, stackTrace) => Container(
+                                color: Colors.grey[300],
+                                child: const Icon(Icons.image, size: 48),
+                              ),
+                            )
+                          : Image.file(
+                              File(widget.product.mainImage!),
+                              fit: BoxFit.cover,
+                              width: double.infinity,
+                              height: double.infinity,
+                              errorBuilder: (context, error, stackTrace) => Container(
+                                color: Colors.grey[300],
+                                child: const Icon(Icons.image, size: 48),
+                              ),
+                            ))
                       : Container(
                           color: Colors.grey[300],
                           child: const Icon(Icons.image, size: 48),
@@ -383,14 +399,20 @@ class _ProductCardState extends State<_ProductCard> {
 class _FilterBottomSheet extends StatefulWidget {
   final String? selectedCategory;
   final String? selectedProvince;
-  final int? minRating;
-  final Function(String?, String?, int?) onApply;
+  final String? selectedDistrict;
+  final String? selectedWard;
+  final String? selectedCondition;
+  final Function(String?, String?, String?, String?, String?) onApply;
+  final ScrollController scrollController;
 
   const _FilterBottomSheet({
     required this.selectedCategory,
     required this.selectedProvince,
-    required this.minRating,
+    required this.selectedDistrict,
+    required this.selectedWard,
+    required this.selectedCondition,
     required this.onApply,
+    required this.scrollController,
   });
 
   @override
@@ -400,99 +422,292 @@ class _FilterBottomSheet extends StatefulWidget {
 class _FilterBottomSheetState extends State<_FilterBottomSheet> {
   late String? _category;
   late String? _province;
-  late int? _rating;
+  late String? _district;
+  late String? _ward;
+  late String? _condition;
 
   @override
   void initState() {
     super.initState();
     _category = widget.selectedCategory;
     _province = widget.selectedProvince;
-    _rating = widget.minRating;
+    _district = widget.selectedDistrict;
+    _ward = widget.selectedWard;
+    _condition = widget.selectedCondition;
   }
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
       child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const Text(
-            'Lọc sản phẩm',
-            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 16),
-          const Text('Danh mục'),
-          DropdownButton<String>(
-            value: _category,
-            isExpanded: true,
-            hint: const Text('Tất cả'),
-            items: [
-              const DropdownMenuItem<String>(value: null, child: Text('Tất cả')),
-              ...AppConstants.categories.map(
-                (cat) => DropdownMenuItem<String>(value: cat, child: Text(cat)),
-              ),
-            ],
-            onChanged: (value) => setState(() => _category = value),
-          ),
-          const SizedBox(height: 16),
-          const Text('Tỉnh/Thành phố'),
-          TextField(
-            decoration: const InputDecoration(
-              hintText: 'Nhập tỉnh/thành phố',
-              border: OutlineInputBorder(),
+          // Drag handle
+          Container(
+            margin: const EdgeInsets.symmetric(vertical: 12),
+            width: 40,
+            height: 4,
+            decoration: BoxDecoration(
+              color: Colors.grey[300],
+              borderRadius: BorderRadius.circular(2),
             ),
-            controller: TextEditingController(text: _province),
-            onChanged: (value) => _province = value.isEmpty ? null : value,
           ),
-          const SizedBox(height: 16),
-          const Text('Đánh giá tối thiểu'),
-          DropdownButton<int>(
-            value: _rating,
-            isExpanded: true,
-            hint: const Text('Không yêu cầu'),
-            items: [
-              const DropdownMenuItem<int>(value: null, child: Text('Không yêu cầu')),
-              ...List.generate(5, (i) => i + 1).map(
-                (r) => DropdownMenuItem<int>(
-                  value: r,
-                  child: Text('$r sao trở lên'),
-                ),
-              ),
-            ],
-            onChanged: (value) => setState(() => _rating = value),
-          ),
-          const SizedBox(height: 24),
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton(
-                  onPressed: () {
-                    setState(() {
-                      _category = null;
-                      _province = null;
-                      _rating = null;
-                    });
-                  },
-                  child: const Text('Xóa bộ lọc'),
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: ElevatedButton(
-                  onPressed: () {
-                    widget.onApply(_category, _province, _rating);
-                    Navigator.pop(context);
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.orange,
-                    foregroundColor: Colors.white,
+          Expanded(
+            child: SingleChildScrollView(
+              controller: widget.scrollController,
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const Text(
+                    'Lọc sản phẩm',
+                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                   ),
-                  child: const Text('Áp dụng'),
-                ),
+                  const SizedBox(height: 24),
+                  const Text(
+                    'Danh mục',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      FilterChip(
+                        label: const Text('Tất cả'),
+                        selected: _category == null,
+                        onSelected: (selected) {
+                          setState(() => _category = null);
+                        },
+                      ),
+                      ...AppConstants.categories.map((cat) {
+                        return FilterChip(
+                          label: Text(cat),
+                          selected: _category == cat,
+                          onSelected: (selected) {
+                            setState(() => _category = selected ? cat : null);
+                          },
+                        );
+                      }),
+                    ],
+                  ),
+                  const SizedBox(height: 24),
+                  const Text(
+                    'Tỉnh/Thành phố',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                  ),
+                  const SizedBox(height: 8),
+                  DropdownButtonFormField<String>(
+                    value: _province,
+                    decoration: const InputDecoration(
+                      border: OutlineInputBorder(),
+                      prefixIcon: Icon(Icons.map),
+                    ),
+                    items: [
+                      const DropdownMenuItem<String>(
+                        value: null,
+                        child: Text('Tất cả'),
+                      ),
+                      ...VietnamAddresses.provinces.map((province) {
+                        return DropdownMenuItem<String>(
+                          value: province,
+                          child: Text(province),
+                        );
+                      }),
+                    ],
+                    onChanged: (value) {
+                      setState(() {
+                        _province = value;
+                        _district = null; // Reset district when province changes
+                        _ward = null; // Reset ward when province changes
+                      });
+                    },
+                  ),
+                  const SizedBox(height: 24),
+                  const Text(
+                    'Quận/Huyện',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                  ),
+                  const SizedBox(height: 8),
+                  DropdownButtonFormField<String>(
+                    value: _district,
+                    decoration: const InputDecoration(
+                      border: OutlineInputBorder(),
+                      prefixIcon: Icon(Icons.location_city),
+                    ),
+                    items: [
+                      const DropdownMenuItem<String>(
+                        value: null,
+                        child: Text('Tất cả'),
+                      ),
+                      if (_province != null)
+                        ...VietnamAddresses.getDistrictsByProvince(_province!).map((district) {
+                          return DropdownMenuItem<String>(
+                            value: district,
+                            child: Text(district),
+                          );
+                        }),
+                    ],
+                    onChanged: _province == null
+                        ? null
+                        : (value) {
+                            setState(() {
+                              _district = value;
+                              _ward = null; // Reset ward when district changes
+                            });
+                          },
+                  ),
+                  const SizedBox(height: 24),
+                  const Text(
+                    'Phường/Xã',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                  ),
+                  const SizedBox(height: 8),
+                  DropdownButtonFormField<String>(
+                    value: _ward,
+                    decoration: const InputDecoration(
+                      border: OutlineInputBorder(),
+                      prefixIcon: Icon(Icons.location_on),
+                    ),
+                    items: [
+                      const DropdownMenuItem<String>(
+                        value: null,
+                        child: Text('Tất cả'),
+                      ),
+                      if (_district != null)
+                        ...VietnamAddresses.getWardsByDistrict(_district!).map((ward) {
+                          return DropdownMenuItem<String>(
+                            value: ward,
+                            child: Text(ward),
+                          );
+                        }),
+                    ],
+                    onChanged: _district == null
+                        ? null
+                        : (value) {
+                            setState(() => _ward = value);
+                          },
+                  ),
+                  const SizedBox(height: 24),
+                  const Text(
+                    'Trạng thái',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: InkWell(
+                          onTap: () {
+                            setState(() {
+                              _condition = _condition == AppConstants.conditionNew
+                                  ? null
+                                  : AppConstants.conditionNew;
+                            });
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            decoration: BoxDecoration(
+                              color: _condition == AppConstants.conditionNew
+                                  ? Colors.orange
+                                  : Colors.grey[200],
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                color: _condition == AppConstants.conditionNew
+                                    ? Colors.orange
+                                    : Colors.grey,
+                              ),
+                            ),
+                            child: Text(
+                              'Chưa sử dụng',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontWeight: FontWeight.w600,
+                                color: _condition == AppConstants.conditionNew
+                                    ? Colors.white
+                                    : Colors.black,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: InkWell(
+                          onTap: () {
+                            setState(() {
+                              _condition = _condition == AppConstants.conditionUsed
+                                  ? null
+                                  : AppConstants.conditionUsed;
+                            });
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            decoration: BoxDecoration(
+                              color: _condition == AppConstants.conditionUsed
+                                  ? Colors.orange
+                                  : Colors.grey[200],
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                color: _condition == AppConstants.conditionUsed
+                                    ? Colors.orange
+                                    : Colors.grey,
+                              ),
+                            ),
+                            child: Text(
+                              'Đã qua sử dụng',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontWeight: FontWeight.w600,
+                                color: _condition == AppConstants.conditionUsed
+                                    ? Colors.white
+                                    : Colors.black87,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 32),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: () {
+                            setState(() {
+                              _category = null;
+                              _province = null;
+                              _district = null;
+                              _ward = null;
+                              _condition = null;
+                            });
+                          },
+                          child: const Text('Xóa bộ lọc'),
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: () {
+                            widget.onApply(_category, _province, _district, _ward, _condition);
+                            Navigator.pop(context);
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.orange,
+                            foregroundColor: Colors.white,
+                          ),
+                          child: const Text('Áp dụng'),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
               ),
-            ],
+            ),
           ),
         ],
       ),

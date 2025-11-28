@@ -1,13 +1,11 @@
 import 'package:flutter/material.dart';
-import '../services/product_service.dart';
-import '../services/notification_service.dart';
-import '../services/auth_service.dart';
+import '../services/supabase_review_service.dart';
 import '../models/review.dart';
 import '../providers/app_state.dart';
 import 'package:provider/provider.dart';
 
 class AddReviewScreen extends StatefulWidget {
-  final int productId;
+  final String productId;
 
   const AddReviewScreen({super.key, required this.productId});
 
@@ -16,9 +14,7 @@ class AddReviewScreen extends StatefulWidget {
 }
 
 class _AddReviewScreenState extends State<AddReviewScreen> {
-  final ProductService _productService = ProductService();
-  final NotificationService _notificationService = NotificationService();
-  final AuthService _authService = AuthService();
+  final SupabaseReviewService _reviewService = SupabaseReviewService();
   final _formKey = GlobalKey<FormState>();
   int _rating = 5;
   final _commentController = TextEditingController();
@@ -48,22 +44,10 @@ class _AddReviewScreenState extends State<AddReviewScreen> {
       createdAt: DateTime.now(),
     );
 
-    final result = await _productService.addReview(review);
+    final result = await _reviewService.addReview(review);
     
-    if (result > 0) {
-      // Get product info to create notification
-      final product = await _productService.getProductById(widget.productId);
-      if (product != null) {
-        final reviewer = await _authService.getUserById(appState.currentUser!.id!);
-        await _notificationService.createReviewNotification(
-          productOwnerId: product.userId,
-          reviewerId: appState.currentUser!.id!,
-          productId: widget.productId,
-          reviewerNickname: reviewer?.nickname ?? 'Người dùng',
-          productName: product.name,
-        );
-      }
-      
+    if (result != null) {
+      // Notification will be created automatically by database trigger
       setState(() => _isLoading = false);
       if (mounted) {
         Navigator.of(context).pop(true);

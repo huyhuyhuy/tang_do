@@ -17,15 +17,7 @@ class AppConstants {
   static const String conditionNew = 'new';
   static const String conditionUsed = 'used';
 
-  // GoldChip Transaction Types
-  static const String transactionTransfer = 'transfer';
-  static const String transactionReferral = 'referral';
-  static const String transactionReceived = 'received';
-
-  // Referral Bonus
-  static const int referralBonus = 100;
-
   // Default Expiry Days
-  static const int defaultExpiryDays = 7;
+  static const int defaultExpiryDays = 30;
 }
 

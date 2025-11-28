@@ -1,11 +1,11 @@
 import 'package:flutter/foundation.dart';
-import '../models/user.dart';
-import '../services/auth_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../models/user.dart';
+import '../services/supabase_auth_service.dart';
 
 class AppState extends ChangeNotifier {
   User? _currentUser;
-  final AuthService _authService = AuthService();
+  final SupabaseAuthService _authService = SupabaseAuthService();
 
   User? get currentUser => _currentUser;
   bool get isLoggedIn => _currentUser != null;
@@ -15,11 +15,14 @@ class AppState extends ChangeNotifier {
   }
 
   Future<void> _loadUser() async {
+    // Load current user ID from SharedPreferences
     final prefs = await SharedPreferences.getInstance();
-    final userId = prefs.getInt('current_user_id');
+    final userId = prefs.getString('current_user_id');
     if (userId != null) {
       _currentUser = await _authService.getUserById(userId);
-      notifyListeners();
+      if (_currentUser != null) {
+        notifyListeners();
+      }
     }
   }
 
@@ -27,8 +30,9 @@ class AppState extends ChangeNotifier {
     final user = await _authService.login(identifier, password);
     if (user != null) {
       _currentUser = user;
+      // Save user ID to SharedPreferences
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setInt('current_user_id', user.id!);
+      await prefs.setString('current_user_id', user.id!);
       notifyListeners();
       return true;
     }
@@ -41,7 +45,6 @@ class AppState extends ChangeNotifier {
     required String password,
     String? name,
     String? email,
-    String? referralCode,
   }) async {
     final user = await _authService.register(
       phone: phone,
@@ -49,12 +52,12 @@ class AppState extends ChangeNotifier {
       password: password,
       name: name,
       email: email,
-      referralCode: referralCode,
     );
     if (user != null) {
       _currentUser = user;
+      // Save user ID to SharedPreferences
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setInt('current_user_id', user.id!);
+      await prefs.setString('current_user_id', user.id!);
       notifyListeners();
       return true;
     }
@@ -62,7 +65,9 @@ class AppState extends ChangeNotifier {
   }
 
   Future<void> logout() async {
+    await _authService.logout();
     _currentUser = null;
+    // Clear user ID from SharedPreferences
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('current_user_id');
     notifyListeners();

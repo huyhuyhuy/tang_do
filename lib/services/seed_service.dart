@@ -29,7 +29,7 @@ class SeedService {
     if (user1 != null) {
       await _authService.updateUser(user1.copyWith(
         email: 'tuananh@example.com',
-        address: '123 Đường ABC',
+        address: '123 Nguyễn Du',
         district: 'Quận 1',
         province: 'TP. Hồ Chí Minh',
         avatar: 'https://i.pravatar.cc/150?img=1',
@@ -45,7 +45,7 @@ class SeedService {
     if (user2 != null) {
       await _authService.updateUser(user2.copyWith(
         email: 'thaiduc@example.com',
-        address: '456 Đường XYZ',
+        address: '456 Lê Văn Sỹ',
         district: 'Quận 3',
         province: 'TP. Hồ Chí Minh',
         avatar: 'https://i.pravatar.cc/150?img=5',
@@ -61,25 +61,59 @@ class SeedService {
     if (user3 != null) {
       await _authService.updateUser(user3.copyWith(
         email: 'huyle99@example.com',
-        address: '789 Đường DEF',
+        address: '789 Nguyễn Thị Thập',
         district: 'Quận 7',
         province: 'TP. Hồ Chí Minh',
         avatar: 'https://i.pravatar.cc/150?img=12',
       ));
     }
 
-    // Create sample products with images (10 products total)
+    // Create additional users from different provinces
+    final user4 = await _authService.register(
+      phone: '0902222222',
+      nickname: 'Minh_Ha',
+      password: '123456',
+      name: 'Phạm Minh Hà',
+    );
+    if (user4 != null) {
+      await _authService.updateUser(user4.copyWith(
+        email: 'minhha@example.com',
+        address: '12 Phố Hàng Bông',
+        district: 'Hoàn Kiếm',
+        province: 'Hà Nội',
+        avatar: 'https://i.pravatar.cc/150?img=8',
+      ));
+    }
+
+    final user5 = await _authService.register(
+      phone: '0903333333',
+      nickname: 'Lan_Anh',
+      password: '123456',
+      name: 'Nguyễn Lan Anh',
+    );
+    if (user5 != null) {
+      await _authService.updateUser(user5.copyWith(
+        email: 'lananh@example.com',
+        address: '45 Trần Phú',
+        district: 'Hải Châu',
+        province: 'Đà Nẵng',
+        avatar: 'https://i.pravatar.cc/150?img=15',
+      ));
+    }
+
+    // Create sample products with images and full addresses
     if (user1 != null) {
-      // Product 1: Quần áo
+      // Product 1: Quần áo - TP.HCM Quận 1
       await _productService.createProduct(Product(
         userId: user1.id!,
         name: 'Áo thun cũ còn tốt',
         description: 'Áo thun nam size M, đã mặc vài lần nhưng còn tốt',
         category: AppConstants.categories[3], // Quần áo
         condition: AppConstants.conditionUsed,
-        address: '123 Đường ABC',
+        address: '123 Nguyễn Du, Phường Bến Nghé',
         district: 'Quận 1',
         province: 'TP. Hồ Chí Minh',
+        contactPhone: user1.phone,
         image1: 'https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=400&h=400&fit=crop',
         image2: 'https://images.unsplash.com/photo-1553062407-98eeb64c6a62?w=400&h=400&fit=crop',
         expiryDays: 7,
@@ -87,16 +121,17 @@ class SeedService {
         expiresAt: now.add(const Duration(days: 7)),
       ));
 
-      // Product 2: Sách
+      // Product 2: Sách - TP.HCM Quận 1
       await _productService.createProduct(Product(
         userId: user1.id!,
         name: 'Sách tiếng Anh',
         description: 'K còn sử dụng, muốn tặng sách học tiếng Anh cơ bản, còn mới',
         category: AppConstants.categories[4], // Sách
         condition: AppConstants.conditionNew,
-        address: '123 Đường ABC',
+        address: '456 Lê Lợi, Phường Bến Thành',
         district: 'Quận 1',
         province: 'TP. Hồ Chí Minh',
+        contactPhone: user1.phone,
         image1: 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400&h=400&fit=crop',
         image2: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&h=400&fit=crop',
         expiryDays: 14,
@@ -104,16 +139,17 @@ class SeedService {
         expiresAt: now.add(const Duration(days: 14)),
       ));
 
-      // Product 3: Đồ điện tử
+      // Product 3: Đồ điện tử - TP.HCM Quận 1
       await _productService.createProduct(Product(
         userId: user1.id!,
         name: 'Bàn phím cơ cũ',
         description: 'Bàn phím cơ còn hoạt động tốt, bỏ xó đã lâu, ai cần ib',
         category: AppConstants.categories[0], // Đồ điện tử
         condition: AppConstants.conditionUsed,
-        address: '123 Đường ABC',
+        address: '789 Đồng Khởi, Phường Đa Kao',
         district: 'Quận 1',
         province: 'TP. Hồ Chí Minh',
+        contactPhone: user1.phone,
         image1: 'https://images.unsplash.com/photo-1587829741301-dc798b83add3?w=400&h=400&fit=crop',
         image2: 'https://images.unsplash.com/photo-1618384887929-16ec33cab9ef?w=400&h=400&fit=crop',
         expiryDays: 10,
@@ -121,16 +157,17 @@ class SeedService {
         expiresAt: now.add(const Duration(days: 10)),
       ));
 
-      // Product 4: Văn phòng phẩm
+      // Product 4: Văn phòng phẩm - TP.HCM Quận 1
       await _productService.createProduct(Product(
         userId: user1.id!,
         name: 'Bút bi và vở',
         description: 'Bộ bút bi và vở học sinh còn mới, chưa sử dụng',
         category: AppConstants.categories[7], // Văn phòng phẩm
         condition: AppConstants.conditionNew,
-        address: '123 Đường ABC',
+        address: '321 Nguyễn Thái Bình, Phường Nguyễn Thái Bình',
         district: 'Quận 1',
         province: 'TP. Hồ Chí Minh',
+        contactPhone: user1.phone,
         image1: 'https://images.unsplash.com/photo-1583484963886-cfe2bff2945f?w=400&h=400&fit=crop',
         image2: 'https://images.unsplash.com/photo-1513475382585-d06e58bcb0e0?w=400&h=400&fit=crop',
         expiryDays: 5,
@@ -140,16 +177,17 @@ class SeedService {
     }
 
     if (user2 != null) {
-      // Product 5: Đồ chơi
+      // Product 5: Đồ chơi - TP.HCM Quận 3
       await _productService.createProduct(Product(
         userId: user2.id!,
         name: 'Đồ chơi trẻ em',
         description: 'Đồ chơi gỗ cho trẻ em, còn mới',
         category: AppConstants.categories[6], // Đồ chơi
         condition: AppConstants.conditionNew,
-        address: '456 Đường XYZ',
+        address: '456 Lê Văn Sỹ, Phường 1',
         district: 'Quận 3',
         province: 'TP. Hồ Chí Minh',
+        contactPhone: user2.phone,
         image1: 'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=400&h=400&fit=crop',
         image2: 'https://images.unsplash.com/photo-1515488042361-ee00e0d4d8be?w=400&h=400&fit=crop',
         image3: 'https://images.unsplash.com/photo-1606312619070-d48b4e001a59?w=400&h=400&fit=crop',
@@ -158,16 +196,17 @@ class SeedService {
         expiresAt: now.add(const Duration(days: 10)),
       ));
 
-      // Product 6: Mỹ phẩm
+      // Product 6: Mỹ phẩm - TP.HCM Quận 3
       await _productService.createProduct(Product(
         userId: user2.id!,
         name: 'Mỹ phẩm chưa dùng',
         description: 'Son môi chưa mở hộp, nguyên tem cho ai cần',
         category: AppConstants.categories[2], // Mỹ phẩm
         condition: AppConstants.conditionNew,
-        address: '456 Đường XYZ',
+        address: '789 Võ Văn Tần, Phường 6',
         district: 'Quận 3',
         province: 'TP. Hồ Chí Minh',
+        contactPhone: user2.phone,
         image1: 'https://images.unsplash.com/photo-1596462502278-27bfdc403348?w=400&h=400&fit=crop',
         image2: 'https://images.unsplash.com/photo-1522338242992-e1a54906a8da?w=400&h=400&fit=crop',
         expiryDays: 5,
@@ -175,16 +214,17 @@ class SeedService {
         expiresAt: now.add(const Duration(days: 5)),
       ));
 
-      // Product 7: Đồ gia dụng
+      // Product 7: Đồ gia dụng - TP.HCM Quận 3
       await _productService.createProduct(Product(
         userId: user2.id!,
         name: 'Bộ nồi inox',
         description: 'Muốn tặng trẻ vùng cao, bộ nồi inox còn mới, chưa sử dụng',
         category: AppConstants.categories[8], // Đồ gia dụng
         condition: AppConstants.conditionNew,
-        address: '456 Đường XYZ',
+        address: '321 Nguyễn Đình Chiểu, Phường 5',
         district: 'Quận 3',
         province: 'TP. Hồ Chí Minh',
+        contactPhone: user2.phone,
         image1: 'https://images.unsplash.com/photo-1556911220-bff31c812dba?w=400&h=400&fit=crop',
         image2: 'https://images.unsplash.com/photo-1556911220-e15b29be8c8f?w=400&h=400&fit=crop',
         expiryDays: 12,
@@ -192,16 +232,17 @@ class SeedService {
         expiresAt: now.add(const Duration(days: 12)),
       ));
 
-      // Product 8: Thực phẩm
+      // Product 8: Thực phẩm - TP.HCM Quận 3
       await _productService.createProduct(Product(
         userId: user2.id!,
         name: 'Gạo và mì tôm',
         description: 'Gạo và mì tôm còn hạn sử dụng, muốn gửi trẻ vùng cao',
         category: AppConstants.categories[1], // Thực phẩm
         condition: AppConstants.conditionNew,
-        address: '456 Đường XYZ',
-        district: 'Quận 3',
+        address: '654 Điện Biên Phủ, Phường 25',
+        district: 'Bình Thạnh',
         province: 'TP. Hồ Chí Minh',
+        contactPhone: user2.phone,
         image1: 'https://images.unsplash.com/photo-1586201375761-83865001e31c?w=400&h=400&fit=crop',
         image2: 'https://images.unsplash.com/photo-1612929633732-8c44b6b0b5c8?w=400&h=400&fit=crop',
         expiryDays: 3,
@@ -211,16 +252,17 @@ class SeedService {
     }
 
     if (user3 != null) {
-      // Product 9: Đồ điện tử
+      // Product 9: Đồ điện tử - TP.HCM Quận 7
       await _productService.createProduct(Product(
         userId: user3.id!,
         name: 'Tai nghe Bluetooth',
         description: 'Ai cần ib. Tai nghe Bluetooth còn hoạt động tốt',
         category: AppConstants.categories[0], // Đồ điện tử
         condition: AppConstants.conditionUsed,
-        address: '789 Đường DEF',
+        address: '789 Nguyễn Thị Thập, Phường Tân Thuận Đông',
         district: 'Quận 7',
         province: 'TP. Hồ Chí Minh',
+        contactPhone: user3.phone,
         image1: 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=400&h=400&fit=crop',
         image2: 'https://images.unsplash.com/photo-1484704849700-f032a568e944?w=400&h=400&fit=crop',
         image3: 'https://images.unsplash.com/photo-1572569511254-d8f925fe2cbb?w=400&h=400&fit=crop',
@@ -229,21 +271,99 @@ class SeedService {
         expiresAt: now.add(const Duration(days: 7)),
       ));
 
-      // Product 10: Thú cưng
+      // Product 10: Thú cưng - TP.HCM Quận 7
       await _productService.createProduct(Product(
         userId: user3.id!,
         name: 'Đồ chơi cho chó',
         description: 'Free. Đồ chơi và thức ăn cho chó còn mới',
         category: AppConstants.categories[5], // Thú cưng
         condition: AppConstants.conditionNew,
-        address: '789 Đường DEF',
+        address: '456 Huỳnh Tấn Phát, Phường Tân Phú',
         district: 'Quận 7',
         province: 'TP. Hồ Chí Minh',
+        contactPhone: user3.phone,
         image1: 'https://images.unsplash.com/photo-1601758228041-f3b2795255f1?w=400&h=400&fit=crop',
         image2: 'https://images.unsplash.com/photo-1601758228041-f3b2795255f1?w=400&h=400&fit=crop',
         expiryDays: 8,
         createdAt: now,
         expiresAt: now.add(const Duration(days: 8)),
+      ));
+    }
+
+    // Add products from other provinces
+    if (user4 != null) {
+      // Product 11: Sách - Hà Nội
+      await _productService.createProduct(Product(
+        userId: user4.id!,
+        name: 'Sách văn học Việt Nam',
+        description: 'Bộ sách văn học Việt Nam còn mới, chưa đọc',
+        category: AppConstants.categories[4], // Sách
+        condition: AppConstants.conditionNew,
+        address: '12 Phố Hàng Bông, Phường Hàng Bông',
+        district: 'Hoàn Kiếm',
+        province: 'Hà Nội',
+        contactPhone: user4.phone,
+        image1: 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400&h=400&fit=crop',
+        image2: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&h=400&fit=crop',
+        expiryDays: 15,
+        createdAt: now,
+        expiresAt: now.add(const Duration(days: 15)),
+      ));
+
+      // Product 12: Quần áo - Hà Nội
+      await _productService.createProduct(Product(
+        userId: user4.id!,
+        name: 'Áo khoác mùa đông',
+        description: 'Áo khoác ấm còn tốt, đã mặc 1 mùa',
+        category: AppConstants.categories[3], // Quần áo
+        condition: AppConstants.conditionUsed,
+        address: '45 Lý Thường Kiệt, Phường Trần Hưng Đạo',
+        district: 'Hoàn Kiếm',
+        province: 'Hà Nội',
+        contactPhone: user4.phone,
+        image1: 'https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=400&h=400&fit=crop',
+        image2: 'https://images.unsplash.com/photo-1553062407-98eeb64c6a62?w=400&h=400&fit=crop',
+        expiryDays: 10,
+        createdAt: now,
+        expiresAt: now.add(const Duration(days: 10)),
+      ));
+    }
+
+    if (user5 != null) {
+      // Product 13: Đồ điện tử - Đà Nẵng
+      await _productService.createProduct(Product(
+        userId: user5.id!,
+        name: 'Chuột máy tính cũ',
+        description: 'Chuột máy tính còn hoạt động tốt, không dùng nữa',
+        category: AppConstants.categories[0], // Đồ điện tử
+        condition: AppConstants.conditionUsed,
+        address: '45 Trần Phú, Phường Hải Châu I',
+        district: 'Hải Châu',
+        province: 'Đà Nẵng',
+        contactPhone: user5.phone,
+        image1: 'https://images.unsplash.com/photo-1527814050087-3793815479db?w=400&h=400&fit=crop',
+        image2: 'https://images.unsplash.com/photo-1612538498456-e861df91d4d0?w=400&h=400&fit=crop',
+        expiryDays: 6,
+        createdAt: now,
+        expiresAt: now.add(const Duration(days: 6)),
+      ));
+
+      // Product 14: Đồ gia dụng - Đà Nẵng
+      await _productService.createProduct(Product(
+        userId: user5.id!,
+        name: 'Bộ chén đĩa sứ',
+        description: 'Bộ chén đĩa sứ còn mới, chưa sử dụng',
+        category: AppConstants.categories[8], // Đồ gia dụng
+        condition: AppConstants.conditionNew,
+        address: '78 Lê Duẩn, Phường Thanh Bình',
+        district: 'Hải Châu',
+        province: 'Đà Nẵng',
+        contactPhone: user5.phone,
+        image1: 'https://images.unsplash.com/photo-1556911220-bff31c812dba?w=400&h=400&fit=crop',
+        image2: 'https://images.unsplash.com/photo-1556911220-e15b29be8c8f?w=400&h=400&fit=crop',
+        expiryDays: 9,
+        createdAt: now,
+        expiresAt: now.add(const Duration(days: 9)),
       ));
     }
   }

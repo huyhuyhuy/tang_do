@@ -38,5 +38,35 @@ class ContactUtils {
       );
     }
   }
+
+  static Future<void> showContactOptions(BuildContext context, String phoneNumber) async {
+    final result = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Liên hệ'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.phone, color: Colors.orange),
+              title: const Text('Gọi điện'),
+              onTap: () => Navigator.pop(context, 'phone'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.chat, color: Colors.blue),
+              title: const Text('Nhắn tin Zalo'),
+              onTap: () => Navigator.pop(context, 'zalo'),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (result == 'phone') {
+      await makePhoneCall(phoneNumber);
+    } else if (result == 'zalo') {
+      await openZalo(phoneNumber);
+    }
+  }
 }
 

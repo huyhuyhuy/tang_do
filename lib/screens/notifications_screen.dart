@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/app_state.dart';
-import '../services/notification_service.dart';
+import '../services/supabase_notification_service.dart';
 import '../widgets/banner_ad_widget.dart';
 import '../models/notification.dart' as models;
 
@@ -12,16 +12,20 @@ class NotificationsScreen extends StatefulWidget {
   State<NotificationsScreen> createState() => _NotificationsScreenState();
 }
 
-class _NotificationsScreenState extends State<NotificationsScreen> {
-  final NotificationService _notificationService = NotificationService();
+class _NotificationsScreenState extends State<NotificationsScreen> with AutomaticKeepAliveClientMixin {
+  final SupabaseNotificationService _notificationService = SupabaseNotificationService();
   List<models.Notification> _notifications = [];
   bool _isLoading = true;
+
+  @override
+  bool get wantKeepAlive => true;
 
   @override
   void initState() {
     super.initState();
     _loadNotifications();
   }
+
 
   Future<void> _loadNotifications() async {
     setState(() => _isLoading = true);
@@ -34,7 +38,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     setState(() => _isLoading = false);
   }
 
-  Future<void> _markAsRead(int notificationId) async {
+  Future<void> _markAsRead(String notificationId) async {
     await _notificationService.markAsRead(notificationId);
     _loadNotifications();
     final appState = context.read<AppState>();
@@ -55,8 +59,6 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     switch (type) {
       case 'review':
         return Icons.rate_review;
-      case 'goldchip_received':
-        return Icons.account_balance_wallet;
       default:
         return Icons.notifications;
     }
@@ -66,8 +68,6 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     switch (type) {
       case 'review':
         return Colors.blue;
-      case 'goldchip_received':
-        return Colors.orange;
       default:
         return Colors.grey;
     }
@@ -75,6 +75,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    super.build(context); // Required for AutomaticKeepAliveClientMixin
     return Scaffold(
       appBar: AppBar(
         title: const Text('Thông báo'),
@@ -109,7 +110,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                     itemBuilder: (context, index) {
                       final notification = _notifications[index];
                       return Dismissible(
-                        key: Key(notification.id.toString()),
+                        key: Key(notification.id ?? ''),
                         direction: DismissDirection.endToStart,
                         background: Container(
                           alignment: Alignment.centerRight,
@@ -152,7 +153,6 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                     },
                   ),
                 ),
-      bottomNavigationBar: const BannerAdWidget(),
     );
   }
 }

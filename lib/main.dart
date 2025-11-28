@@ -1,20 +1,23 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'providers/app_state.dart' as app_provider;
 import 'screens/login_screen.dart';
-import 'screens/main_feed_screen.dart';
-import 'services/seed_service.dart';
+import 'screens/main_screen.dart';
+import 'config/supabase_config.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
+  // Initialize Supabase (only for database access, not Auth)
+  await Supabase.initialize(
+    url: SupabaseConfig.url,
+    anonKey: SupabaseConfig.anonKey,
+  );
+  
   // Initialize Mobile Ads
   await MobileAds.instance.initialize();
-  
-  // Seed sample data for testing
-  final seedService = SeedService();
-  await seedService.seedData();
   
   runApp(const MyApp());
 }
@@ -47,7 +50,7 @@ class AuthWrapper extends StatelessWidget {
     return Consumer<app_provider.AppState>(
       builder: (context, appState, _) {
         if (appState.isLoggedIn) {
-          return const MainFeedScreen();
+          return const MainScreen();
         }
         return const LoginScreen();
       },

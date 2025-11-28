@@ -76,23 +76,5 @@ class NotificationService {
     await createNotification(notification);
   }
 
-  Future<void> createGoldChipReceivedNotification({
-    required int userId,
-    required int fromUserId,
-    required int amount,
-    String? fromUserNickname,
-  }) async {
-    final notification = Notification(
-      userId: userId,
-      type: 'goldchip_received',
-      title: 'Nhận GoldChip',
-      message: fromUserNickname != null
-          ? 'Bạn đã nhận $amount GoldChip từ $fromUserNickname'
-          : 'Bạn đã nhận $amount GoldChip',
-      relatedId: fromUserId,
-      createdAt: DateTime.now(),
-    );
-    await createNotification(notification);
-  }
 }
 

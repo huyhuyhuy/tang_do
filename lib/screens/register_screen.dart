@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/app_state.dart';
-import '../services/auth_service.dart';
-import 'main_feed_screen.dart';
+import '../services/supabase_auth_service.dart';
+import 'main_screen.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -19,11 +19,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
-  final _referralCodeController = TextEditingController();
   bool _isLoading = false;
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
-  final AuthService _authService = AuthService();
+  final SupabaseAuthService _authService = SupabaseAuthService();
 
   @override
   void dispose() {
@@ -33,7 +32,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
     _emailController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
-    _referralCodeController.dispose();
     super.dispose();
   }
 
@@ -73,21 +71,19 @@ class _RegisterScreenState extends State<RegisterScreen> {
     }
 
     final appState = context.read<AppState>();
-    final referralCode = _referralCodeController.text.trim();
     final success = await appState.register(
       phone: _phoneController.text.trim(),
       nickname: _nicknameController.text.trim(),
       password: _passwordController.text,
       name: _nameController.text.trim().isEmpty ? null : _nameController.text.trim(),
-      email: _emailController.text.trim(),
-      referralCode: referralCode.isEmpty ? null : referralCode,
+      email: _emailController.text.trim().isEmpty ? null : _emailController.text.trim(),
     );
 
     setState(() => _isLoading = false);
 
     if (success && mounted) {
       Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (_) => const MainFeedScreen()),
+        MaterialPageRoute(builder: (_) => const MainScreen()),
       );
     } else if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -120,7 +116,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     labelText: 'Số điện thoại *',
                     border: OutlineInputBorder(),
                     prefixIcon: Icon(Icons.phone),
-                    helperText: 'Số điện thoại không thể thay đổi sau khi đăng ký',
                   ),
                   keyboardType: TextInputType.phone,
                   validator: (value) {
@@ -140,7 +135,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     labelText: 'Nickname *',
                     border: OutlineInputBorder(),
                     prefixIcon: Icon(Icons.alternate_email),
-                    helperText: 'Nickname không thể thay đổi sau khi đăng ký',
                   ),
                   validator: (value) {
                     if (value == null || value.trim().isEmpty) {
@@ -165,17 +159,16 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 TextFormField(
                   controller: _emailController,
                   decoration: const InputDecoration(
-                    labelText: 'Email *',
+                    labelText: 'Email (tùy chọn)',
                     border: OutlineInputBorder(),
                     prefixIcon: Icon(Icons.email),
                   ),
                   keyboardType: TextInputType.emailAddress,
                   validator: (value) {
-                    if (value == null || value.trim().isEmpty) {
-                      return 'Vui lòng nhập email';
-                    }
-                    if (!value.contains('@') || !value.contains('.')) {
-                      return 'Email không hợp lệ';
+                    if (value != null && value.trim().isNotEmpty) {
+                      if (!value.contains('@') || !value.contains('.')) {
+                        return 'Email không hợp lệ';
+                      }
                     }
                     return null;
                   },
@@ -206,18 +199,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     }
                     return null;
                   },
-                ),
-                const SizedBox(height: 16),
-                TextFormField(
-                  controller: _referralCodeController,
-                  decoration: const InputDecoration(
-                    labelText: 'Mã giới thiệu (tùy chọn)',
-                    border: OutlineInputBorder(),
-                    prefixIcon: Icon(Icons.card_giftcard),
-                    hintText: 'Nhập số điện thoại người giới thiệu',
-                    helperText: 'Nhập mã giới thiệu để người giới thiệu nhận 100 GoldChip',
-                  ),
-                  keyboardType: TextInputType.phone,
                 ),
                 const SizedBox(height: 16),
                 TextFormField(

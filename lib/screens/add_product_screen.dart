@@ -5,48 +5,88 @@ import 'dart:io';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as path;
 import '../providers/app_state.dart';
-import '../services/product_service.dart';
+import '../services/supabase_product_service.dart';
 import '../models/product.dart';
 import '../utils/constants.dart';
+import '../utils/vietnam_addresses.dart';
+import '../widgets/banner_ad_widget.dart';
 
 class AddProductScreen extends StatefulWidget {
-  const AddProductScreen({super.key});
+  final VoidCallback? onProductAdded;
+  final bool showBannerAd;
+  
+  const AddProductScreen({super.key, this.onProductAdded, this.showBannerAd = true});
 
   @override
   State<AddProductScreen> createState() => _AddProductScreenState();
 }
 
-class _AddProductScreenState extends State<AddProductScreen> {
+class _AddProductScreenState extends State<AddProductScreen> with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => false; // Don't keep alive, reset form when switching tabs
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _descriptionController = TextEditingController();
   final _addressController = TextEditingController();
-  final _provinceController = TextEditingController();
-  final _districtController = TextEditingController();
-  final ProductService _productService = ProductService();
+  final _contactPhoneController = TextEditingController();
+  final _districtTextController = TextEditingController();
+  final _wardTextController = TextEditingController();
+  final SupabaseProductService _productService = SupabaseProductService();
 
   String? _selectedCategory;
   String _selectedCondition = AppConstants.conditionUsed;
   int _expiryDays = AppConstants.defaultExpiryDays;
   bool _useDefaultAddress = true;
+  bool _useDefaultPhone = true;
   bool _isLoading = false;
   final ImagePicker _imagePicker = ImagePicker();
   List<File?> _selectedImages = [null, null, null];
+  
+  // Address selection
+  String? _selectedProvince;
+  String? _selectedDistrict;
+  String? _selectedWard;
 
   @override
   void dispose() {
     _nameController.dispose();
     _descriptionController.dispose();
     _addressController.dispose();
-    _provinceController.dispose();
-    _districtController.dispose();
+    _contactPhoneController.dispose();
+    _districtTextController.dispose();
+    _wardTextController.dispose();
     super.dispose();
   }
 
   Future<void> _pickImage(int index) async {
     try {
+      // Show dialog to choose camera or gallery
+      final ImageSource? source = await showDialog<ImageSource>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Chọn ảnh'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: const Icon(Icons.camera_alt),
+                title: const Text('Chụp ảnh'),
+                onTap: () => Navigator.pop(context, ImageSource.camera),
+              ),
+              ListTile(
+                leading: const Icon(Icons.photo_library),
+                title: const Text('Chọn từ thư viện'),
+                onTap: () => Navigator.pop(context, ImageSource.gallery),
+              ),
+            ],
+          ),
+        ),
+      );
+      
+      if (source == null) return;
+      
       final XFile? image = await _imagePicker.pickImage(
-        source: ImageSource.gallery,
+        source: source,
         imageQuality: 85,
       );
       
@@ -115,12 +155,11 @@ class _AddProductScreenState extends State<AddProductScreen> {
       address: _useDefaultAddress ? user.address : _addressController.text.trim().isEmpty
           ? null
           : _addressController.text.trim(),
-      province: _useDefaultAddress ? user.province : _provinceController.text.trim().isEmpty
+      province: _useDefaultAddress ? user.province : _selectedProvince,
+      district: _useDefaultAddress ? user.district : _selectedDistrict,
+      contactPhone: _useDefaultPhone ? user.phone : _contactPhoneController.text.trim().isEmpty
           ? null
-          : _provinceController.text.trim(),
-      district: _useDefaultAddress ? user.district : _districtController.text.trim().isEmpty
-          ? null
-          : _districtController.text.trim(),
+          : _contactPhoneController.text.trim(),
       image1: _selectedImages[0]?.path,
       image2: _selectedImages[1]?.path,
       image3: _selectedImages[2]?.path,
@@ -132,8 +171,12 @@ class _AddProductScreenState extends State<AddProductScreen> {
     final id = await _productService.createProduct(product);
     setState(() => _isLoading = false);
 
-    if (id > 0 && mounted) {
-      Navigator.of(context).pop(true);
+    if (id != null && mounted) {
+      if (widget.onProductAdded != null) {
+        widget.onProductAdded!();
+      } else {
+        Navigator.of(context).pop(true);
+      }
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Đã thêm sản phẩm')),
       );
@@ -149,6 +192,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
 
   @override
   Widget build(BuildContext context) {
+    super.build(context); // Required for AutomaticKeepAliveClientMixin
     final appState = context.watch<AppState>();
     final user = appState.currentUser;
 
@@ -156,6 +200,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
       appBar: AppBar(
         title: const Text('Thêm sản phẩm'),
       ),
+      bottomNavigationBar: widget.showBannerAd ? BannerAdWidget() : null,
       body: Form(
         key: _formKey,
         child: SingleChildScrollView(
@@ -226,7 +271,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
                           ),
                         ),
                         child: Text(
-                          'Mới',
+                          'Chưa sử dụng',
                           textAlign: TextAlign.center,
                           style: TextStyle(
                             fontWeight: FontWeight.w600,
@@ -376,6 +421,51 @@ class _AddProductScreenState extends State<AddProductScreen> {
                 ],
               ),
               const SizedBox(height: 16),
+              // Contact Phone Section
+              CheckboxListTile(
+                title: const Text('Sử dụng số điện thoại mặc định'),
+                value: _useDefaultPhone,
+                onChanged: (value) {
+                  setState(() => _useDefaultPhone = value ?? true);
+                },
+              ),
+              if (!_useDefaultPhone) ...[
+                TextFormField(
+                  controller: _contactPhoneController,
+                  decoration: const InputDecoration(
+                    labelText: 'Số điện thoại liên hệ *',
+                    border: OutlineInputBorder(),
+                    prefixIcon: Icon(Icons.phone),
+                  ),
+                  keyboardType: TextInputType.phone,
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) {
+                      return 'Vui lòng nhập số điện thoại';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 16),
+              ] else if (user != null) ...[
+                const SizedBox(height: 8),
+                Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(12.0),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.phone, color: Colors.grey),
+                        const SizedBox(width: 8),
+                        Text(
+                          'SĐT liên hệ: ${user.phone}',
+                          style: const TextStyle(fontWeight: FontWeight.w500),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+              ],
+              // Address Section
               CheckboxListTile(
                 title: const Text('Sử dụng địa chỉ mặc định'),
                 value: _useDefaultAddress,
@@ -387,29 +477,187 @@ class _AddProductScreenState extends State<AddProductScreen> {
                 TextFormField(
                   controller: _addressController,
                   decoration: const InputDecoration(
-                    labelText: 'Địa chỉ',
+                    labelText: 'Địa chỉ chi tiết *',
                     border: OutlineInputBorder(),
                     prefixIcon: Icon(Icons.home),
+                    hintText: 'Số nhà, tên đường...',
                   ),
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) {
+                      return 'Vui lòng nhập địa chỉ chi tiết';
+                    }
+                    return null;
+                  },
                 ),
                 const SizedBox(height: 16),
-                TextFormField(
-                  controller: _districtController,
+                const Text('Tỉnh/Thành phố *'),
+                const SizedBox(height: 8),
+                DropdownButtonFormField<String>(
+                  value: _selectedProvince,
                   decoration: const InputDecoration(
-                    labelText: 'Quận/Huyện',
-                    border: OutlineInputBorder(),
-                    prefixIcon: Icon(Icons.location_city),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                TextFormField(
-                  controller: _provinceController,
-                  decoration: const InputDecoration(
-                    labelText: 'Tỉnh/Thành phố',
                     border: OutlineInputBorder(),
                     prefixIcon: Icon(Icons.map),
                   ),
+                  items: [
+                    const DropdownMenuItem<String>(
+                      value: null,
+                      child: Text('Chọn Tỉnh/Thành phố'),
+                    ),
+                    ...VietnamAddresses.provinces.toSet().map((province) {
+                      return DropdownMenuItem<String>(
+                        value: province,
+                        child: Text(province),
+                      );
+                    }),
+                  ],
+                  onChanged: (value) {
+                    setState(() {
+                      _selectedProvince = value;
+                      _selectedDistrict = null; // Reset district when province changes
+                      _selectedWard = null; // Reset ward when province changes
+                      _districtTextController.clear();
+                      _wardTextController.clear();
+                    });
+                  },
+                  validator: (value) {
+                    if (value == null) {
+                      return 'Vui lòng chọn Tỉnh/Thành phố';
+                    }
+                    return null;
+                  },
                 ),
+                const SizedBox(height: 16),
+                const Text('Quận/Huyện *'),
+                const SizedBox(height: 8),
+                _selectedProvince == null
+                    ? DropdownButtonFormField<String>(
+                        value: null,
+                        decoration: const InputDecoration(
+                          border: OutlineInputBorder(),
+                          prefixIcon: Icon(Icons.location_city),
+                        ),
+                        items: const [
+                          DropdownMenuItem<String>(
+                            value: null,
+                            child: Text('Chọn Tỉnh/Thành phố trước'),
+                          ),
+                        ],
+                        onChanged: null,
+                        validator: (value) {
+                          return 'Vui lòng chọn Tỉnh/Thành phố trước';
+                        },
+                      )
+                    : VietnamAddresses.getDistrictsByProvince(_selectedProvince!).isEmpty
+                        ? TextFormField(
+                            controller: _districtTextController,
+                            decoration: const InputDecoration(
+                              labelText: 'Quận/Huyện *',
+                              border: OutlineInputBorder(),
+                              prefixIcon: Icon(Icons.location_city),
+                              hintText: 'Nhập tên Quận/Huyện',
+                            ),
+                            onChanged: (value) {
+                              setState(() {
+                                _selectedDistrict = value.isEmpty ? null : value;
+                                _selectedWard = null; // Reset ward when district changes
+                                _wardTextController.clear();
+                              });
+                            },
+                            validator: (value) {
+                              if (value == null || value.trim().isEmpty) {
+                                return 'Vui lòng nhập Quận/Huyện';
+                              }
+                              return null;
+                            },
+                          )
+                        : DropdownButtonFormField<String>(
+                            value: _selectedDistrict,
+                            decoration: const InputDecoration(
+                              border: OutlineInputBorder(),
+                              prefixIcon: Icon(Icons.location_city),
+                            ),
+                            items: [
+                              const DropdownMenuItem<String>(
+                                value: null,
+                                child: Text('Chọn Quận/Huyện'),
+                              ),
+                              ...VietnamAddresses.getDistrictsByProvince(_selectedProvince!).map((district) {
+                                return DropdownMenuItem<String>(
+                                  value: district,
+                                  child: Text(district),
+                                );
+                              }),
+                            ],
+                            onChanged: (value) {
+                              setState(() {
+                                _selectedDistrict = value;
+                                _selectedWard = null; // Reset ward when district changes
+                              });
+                            },
+                            validator: (value) {
+                              if (value == null) {
+                                return 'Vui lòng chọn Quận/Huyện';
+                              }
+                              return null;
+                            },
+                          ),
+                const SizedBox(height: 16),
+                const Text('Phường/Xã'),
+                const SizedBox(height: 8),
+                _selectedDistrict == null
+                    ? DropdownButtonFormField<String>(
+                        value: null,
+                        decoration: const InputDecoration(
+                          border: OutlineInputBorder(),
+                          prefixIcon: Icon(Icons.location_on),
+                        ),
+                        items: const [
+                          DropdownMenuItem<String>(
+                            value: null,
+                            child: Text('Chọn Quận/Huyện trước'),
+                          ),
+                        ],
+                        onChanged: null,
+                      )
+                    : VietnamAddresses.getWardsByDistrict(_selectedDistrict!).isEmpty
+                        ? TextFormField(
+                            controller: _wardTextController,
+                            decoration: const InputDecoration(
+                              labelText: 'Phường/Xã (tùy chọn)',
+                              border: OutlineInputBorder(),
+                              prefixIcon: Icon(Icons.location_on),
+                              hintText: 'Nhập tên Phường/Xã',
+                            ),
+                            onChanged: (value) {
+                              setState(() {
+                                _selectedWard = value.isEmpty ? null : value;
+                              });
+                            },
+                          )
+                        : DropdownButtonFormField<String>(
+                            value: _selectedWard,
+                            decoration: const InputDecoration(
+                              border: OutlineInputBorder(),
+                              prefixIcon: Icon(Icons.location_on),
+                            ),
+                            items: [
+                              const DropdownMenuItem<String>(
+                                value: null,
+                                child: Text('Chọn Phường/Xã (tùy chọn)'),
+                              ),
+                              ...VietnamAddresses.getWardsByDistrict(_selectedDistrict!).map((ward) {
+                                return DropdownMenuItem<String>(
+                                  value: ward,
+                                  child: Text(ward),
+                                );
+                              }),
+                            ],
+                            onChanged: (value) {
+                              setState(() {
+                                _selectedWard = value;
+                              });
+                            },
+                          ),
               ] else if (user != null) ...[
                 const SizedBox(height: 8),
                 Card(

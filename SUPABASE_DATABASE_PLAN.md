@@ -28,12 +28,11 @@ CREATE TABLE public.users (
   phone TEXT UNIQUE NOT NULL,
   nickname TEXT UNIQUE NOT NULL,
   name TEXT,
-  email TEXT NOT NULL, -- Bắt buộc khi đăng ký
+  email TEXT, -- Tùy chọn khi đăng ký
   address TEXT,
   province TEXT,
   district TEXT,
   avatar_url TEXT, -- URL từ storage bucket 'avatars'
-  gold_chip INTEGER DEFAULT 0 NOT NULL CHECK (gold_chip >= 0),
   created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL,
   updated_at TIMESTAMPTZ DEFAULT NOW() NOT NULL,
   
@@ -68,7 +67,7 @@ CREATE TRIGGER update_users_updated_at
 
 **Lưu ý quan trọng:**
 - `phone` và `nickname` là UNIQUE và NOT NULL - không thể thay đổi sau khi đăng ký
-- `email` là NOT NULL - bắt buộc khi đăng ký
+- `email` là tùy chọn - có thể để trống khi đăng ký
 - `auth_user_id` liên kết với Supabase Auth
 
 ---
@@ -91,6 +90,8 @@ CREATE TABLE public.products (
   address TEXT,
   province TEXT,
   district TEXT,
+  ward TEXT, -- Phường/Xã
+  contact_phone TEXT, -- Số điện thoại liên hệ cho sản phẩm
   image1_url TEXT, -- URL từ storage bucket 'product-images'
   image2_url TEXT,
   image3_url TEXT,
@@ -139,6 +140,8 @@ CREATE TRIGGER set_products_expires_at
 
 **Lưu ý:**
 - Chỉ có 3 ảnh: `image1_url`, `image2_url`, `image3_url` (không có image4)
+- `contact_phone`: Số điện thoại liên hệ cho sản phẩm (có thể khác với số điện thoại của user)
+- Thời gian hết hạn mặc định: 30 ngày
 - Tự động tính `expires_at` từ `expiry_days`
 - Full-text search hỗ trợ tiếng Việt
 
@@ -194,7 +197,7 @@ Lưu trữ thông báo cho users.
 CREATE TABLE public.notifications (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
-  type TEXT NOT NULL CHECK (type IN ('review', 'goldchip_received')),
+  type TEXT NOT NULL CHECK (type IN ('review')),
   title TEXT NOT NULL CHECK (char_length(title) >= 1),
   message TEXT,
   related_id UUID, -- product_id hoặc transaction_id tùy type
@@ -225,39 +228,6 @@ $$ LANGUAGE plpgsql;
 
 ---
 
-### Table: `goldchip_transactions`
-
-Lưu trữ lịch sử giao dịch GoldChip.
-
-```sql
-CREATE TABLE public.goldchip_transactions (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  from_user_id UUID REFERENCES public.users(id) ON DELETE SET NULL, -- NULL cho referral
-  to_user_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
-  amount INTEGER NOT NULL CHECK (amount > 0),
-  type TEXT NOT NULL CHECK (type IN ('transfer', 'referral', 'received')),
-  description TEXT,
-  created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL
-);
-
--- Indexes
-CREATE INDEX idx_goldchip_transactions_from_user ON public.goldchip_transactions(from_user_id);
-CREATE INDEX idx_goldchip_transactions_to_user ON public.goldchip_transactions(to_user_id);
-CREATE INDEX idx_goldchip_transactions_type ON public.goldchip_transactions(type);
-CREATE INDEX idx_goldchip_transactions_created_at ON public.goldchip_transactions(created_at DESC);
-
--- Composite index cho query lịch sử của user
-CREATE INDEX idx_goldchip_transactions_user_history ON public.goldchip_transactions(to_user_id, created_at DESC);
-CREATE INDEX idx_goldchip_transactions_from_user_history ON public.goldchip_transactions(from_user_id, created_at DESC) 
-  WHERE from_user_id IS NOT NULL;
-```
-
-**Lưu ý:**
-- `from_user_id` có thể NULL (cho referral bonus từ hệ thống)
-- Mỗi transaction tạo 2 records: một cho sender (type='transfer'), một cho receiver (type='received')
-
----
-
 ### Table: `follows`
 
 Lưu trữ quan hệ follow giữa users (hiện tại không dùng trong UI nhưng giữ lại cho tương lai).
@@ -279,28 +249,6 @@ CREATE TABLE public.follows (
 CREATE INDEX idx_follows_follower ON public.follows(follower_id);
 CREATE INDEX idx_follows_following ON public.follows(following_id);
 CREATE INDEX idx_follows_created_at ON public.follows(created_at DESC);
-```
-
----
-
-### Table: `referrals`
-
-Lưu trữ hệ thống giới thiệu bạn bè.
-
-```sql
-CREATE TABLE public.referrals (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  referrer_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
-  referred_phone TEXT NOT NULL,
-  is_completed BOOLEAN DEFAULT FALSE NOT NULL,
-  created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL,
-  completed_at TIMESTAMPTZ
-);
-
--- Indexes
-CREATE INDEX idx_referrals_referrer ON public.referrals(referrer_id);
-CREATE INDEX idx_referrals_referred_phone ON public.referrals(referred_phone);
-CREATE INDEX idx_referrals_is_completed ON public.referrals(is_completed);
 ```
 
 ---
@@ -422,27 +370,6 @@ CREATE POLICY "Users can update own notifications"
   );
 ```
 
-### GoldChip Transactions Table
-
-```sql
-ALTER TABLE public.goldchip_transactions ENABLE ROW LEVEL SECURITY;
-
--- Users chỉ có thể xem transactions liên quan đến mình
-CREATE POLICY "Users can view own transactions"
-  ON public.goldchip_transactions FOR SELECT
-  USING (
-    auth.uid() IN (
-      SELECT auth_user_id FROM public.users 
-      WHERE id = from_user_id OR id = to_user_id
-    )
-  );
-
--- Chỉ hệ thống có thể tạo transactions (qua service role hoặc function)
-CREATE POLICY "System can create transactions"
-  ON public.goldchip_transactions FOR INSERT
-  WITH CHECK (true);
-```
-
 ---
 
 ## Storage Buckets
@@ -515,85 +442,6 @@ CREATE POLICY "Users can delete own product images"
 ---
 
 ## Database Functions
-
-### Function: Transfer GoldChip
-
-```sql
-CREATE OR REPLACE FUNCTION transfer_goldchip(
-  p_from_user_id UUID,
-  p_to_user_id UUID,
-  p_amount INTEGER,
-  p_description TEXT DEFAULT NULL
-)
-RETURNS BOOLEAN AS $$
-DECLARE
-  v_from_balance INTEGER;
-  v_to_balance INTEGER;
-BEGIN
-  -- Validate
-  IF p_from_user_id = p_to_user_id OR p_amount <= 0 THEN
-    RETURN FALSE;
-  END IF;
-
-  -- Check sender balance
-  SELECT gold_chip INTO v_from_balance
-  FROM public.users
-  WHERE id = p_from_user_id;
-  
-  IF v_from_balance IS NULL OR v_from_balance < p_amount THEN
-    RETURN FALSE;
-  END IF;
-
-  -- Transaction
-  BEGIN
-    -- Update sender balance
-    UPDATE public.users
-    SET gold_chip = gold_chip - p_amount
-    WHERE id = p_from_user_id;
-
-    -- Update receiver balance
-    UPDATE public.users
-    SET gold_chip = gold_chip + p_amount
-    WHERE id = p_to_user_id;
-
-    -- Create transaction records
-    INSERT INTO public.goldchip_transactions (from_user_id, to_user_id, amount, type, description)
-    VALUES (p_from_user_id, p_to_user_id, p_amount, 'transfer', p_description);
-
-    INSERT INTO public.goldchip_transactions (from_user_id, to_user_id, amount, type, description)
-    VALUES (p_from_user_id, p_to_user_id, p_amount, 'received', p_description);
-
-    RETURN TRUE;
-  EXCEPTION
-    WHEN OTHERS THEN
-      RETURN FALSE;
-  END;
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
-```
-
-### Function: Add Referral Bonus
-
-```sql
-CREATE OR REPLACE FUNCTION add_referral_bonus(p_user_id UUID)
-RETURNS BOOLEAN AS $$
-DECLARE
-  v_bonus_amount INTEGER := 100;
-BEGIN
-  UPDATE public.users
-  SET gold_chip = gold_chip + v_bonus_amount
-  WHERE id = p_user_id;
-
-  INSERT INTO public.goldchip_transactions (from_user_id, to_user_id, amount, type, description)
-  VALUES (NULL, p_user_id, v_bonus_amount, 'referral', 'Referral bonus');
-
-  RETURN TRUE;
-EXCEPTION
-  WHEN OTHERS THEN
-    RETURN FALSE;
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
-```
 
 ### Function: Create Notification
 
@@ -711,14 +559,17 @@ CREATE TRIGGER trigger_notify_on_review
 ## Notes
 
 ### Quan trọng:
-1. **Email bắt buộc**: Email là NOT NULL trong users table
+1. **Email tùy chọn**: Email có thể để trống khi đăng ký
 2. **Phone và Nickname không thể thay đổi**: Enforced bằng RLS policy và application logic
 3. **Chỉ 3 ảnh sản phẩm**: image1_url, image2_url, image3_url (không có image4)
-4. **UUID thay vì INTEGER**: Tất cả id sử dụng UUID để tránh conflicts
-5. **Timestamps với timezone**: Sử dụng TIMESTAMPTZ thay vì INTEGER milliseconds
-6. **Full-text search**: Hỗ trợ tìm kiếm tiếng Việt
-7. **RLS Security**: Tất cả tables đều có RLS enabled
-8. **Ads Integration**: App hiện tại đã tích hợp Google AdMob với banner ads. Khi migrate sang Supabase, ads integration sẽ không bị ảnh hưởng vì nó hoạt động độc lập với database backend.
+4. **Contact Phone**: Mỗi sản phẩm có số điện thoại liên hệ riêng (có thể khác với số điện thoại của user)
+5. **Thời gian hết hạn mặc định**: 30 ngày
+6. **UUID thay vì INTEGER**: Tất cả id sử dụng UUID để tránh conflicts
+7. **Timestamps với timezone**: Sử dụng TIMESTAMPTZ thay vì INTEGER milliseconds
+8. **Full-text search**: Hỗ trợ tìm kiếm tiếng Việt
+9. **RLS Security**: Tất cả tables đều có RLS enabled
+10. **Ads Integration**: App hiện tại đã tích hợp Google AdMob với banner ads. Khi migrate sang Supabase, ads integration sẽ không bị ảnh hưởng vì nó hoạt động độc lập với database backend.
+11. **Đã xóa GoldChip**: Toàn bộ chức năng GoldChip, ví, chuyển GoldChip, và referral bonus đã được xóa khỏi app
 
 ### Performance:
 - Indexes được tối ưu cho các query phổ biến
@@ -737,10 +588,10 @@ CREATE TRIGGER trigger_notify_on_review
 
 Tất cả SQL scripts được tổ chức trong thư mục `supabase/migrations/`:
 
-1. `001_initial_schema.sql` - Tạo tất cả tables và indexes
-2. `002_functions.sql` - Tạo các functions
+1. `001_initial_schema.sql` - Tạo tất cả tables và indexes (không bao gồm goldchip_transactions và referrals)
+2. `002_functions.sql` - Tạo các functions (chỉ create_notification, không có transfer_goldchip và add_referral_bonus)
 3. `003_triggers.sql` - Tạo các triggers
-4. `004_rls_policies.sql` - Setup RLS policies
+4. `004_rls_policies.sql` - Setup RLS policies (không bao gồm goldchip_transactions)
 5. `005_storage_policies.sql` - Setup storage policies
 
 ---

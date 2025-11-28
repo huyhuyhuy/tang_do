@@ -1,3 +1,22 @@
+<!-- quảng cáo cho android -->
+
+ID ứng dụng: ca-app-pub-4969810842586372~8341729290
+ID Biểu ngữ: ca-app-pub-4969810842586372/3224423548
+ID quảng cáo khi mở app: ca-app-pub-4969810842586372/7842325400
+
+<!-- quảng cáo cho ios -->
+ID ứng dụng: ca-app-pub-4969810842586372~3872835394
+ID quảng cáo biểu ngữ: ca-app-pub-4969810842586372/7346118490
+ID quảng cáo khi mở app: ca-app-pub-4969810842586372/5026134966
+
+
+<!-- supabase -->
+project url: https://sdbasjrsnwfibwocjdfl.supabase.co
+
+anon public key: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNkYmFzanJzbndmaWJ3b2NqZGZsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQzMjA4NDMsImV4cCI6MjA3OTg5Njg0M30.luQ9vJWdl-UM9mrKuzMtVNS2l1_eQU4NSPtcYS0WoVQ
+
+service role key: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNkYmFzanJzbndmaWJ3b2NqZGZsIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2NDMyMDg0MywiZXhwIjoyMDc5ODk2ODQzfQ.AwYX5xNLvrxyaz3nlwIMTbUpwmZMsMyBH7snCuVlyPM
+
 # App TangDo
 
 Ứng dụng mobile đa nền tảng (iOS và Android) được xây dựng bằng Flutter, cho phép người dùng chia sẻ và tặng đồ cũ cho nhau.
@@ -16,7 +35,7 @@
 - Mỗi sản phẩm có:
   - Tên sản phẩm, mô tả
   - Danh mục: Đồ điện tử, Thực phẩm, Mỹ phẩm, Quần áo, Sách, Thú cưng, Đồ chơi, Văn phòng phẩm, Đồ gia dụng, Khác
-  - Trạng thái: Mới / Đã qua sử dụng
+  - Trạng thái: Chưa sử dụng / Đã qua sử dụng
   - Tối đa 3 ảnh (upload từ thiết bị)
   - Địa chỉ (mặc định từ profile hoặc tùy chỉnh)
   - Thời gian hết hạn (tự động xóa sau X ngày)

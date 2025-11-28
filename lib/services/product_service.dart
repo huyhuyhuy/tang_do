@@ -59,7 +59,7 @@ class ProductService {
     String? category,
     String? province,
     String? district,
-    int? minRating,
+    String? condition,
     String? searchQuery,
   }) async {
     final db = await _dbHelper.database;
@@ -82,6 +82,11 @@ class ProductService {
       whereArgs.add(district);
     }
 
+    if (condition != null && condition.isNotEmpty) {
+      where += ' AND condition = ?';
+      whereArgs.add(condition);
+    }
+
     if (searchQuery != null && searchQuery.isNotEmpty) {
       where += ' AND (name LIKE ? OR description LIKE ?)';
       final query = '%$searchQuery%';
@@ -96,44 +101,7 @@ class ProductService {
       orderBy: 'created_at DESC',
     );
 
-    List<Product> products = maps.map((map) => Product.fromMap(map)).toList();
-
-    // Filter by rating if needed
-    if (minRating != null && minRating > 0) {
-      products = await _filterByRating(products, minRating);
-    }
-
-    return products;
-  }
-
-  Future<List<Product>> _filterByRating(
-    List<Product> products,
-    int minRating,
-  ) async {
-    final db = await _dbHelper.database;
-    final List<Product> filtered = [];
-
-    for (final product in products) {
-      final reviews = await db.query(
-        'reviews',
-        where: 'product_id = ?',
-        whereArgs: [product.id],
-      );
-
-      if (reviews.isEmpty) continue;
-
-      final totalRating = reviews.fold<int>(
-        0,
-        (sum, review) => sum + (review['rating'] as int),
-      );
-      final avgRating = totalRating / reviews.length;
-
-      if (avgRating >= minRating) {
-        filtered.add(product);
-      }
-    }
-
-    return filtered;
+    return maps.map((map) => Product.fromMap(map)).toList();
   }
 
   Future<double> getProductAverageRating(int productId) async {
