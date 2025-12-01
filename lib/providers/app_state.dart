@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/user.dart';
 import '../services/supabase_auth_service.dart';
+import '../services/interstitial_ad_service.dart';
 
 class AppState extends ChangeNotifier {
   User? _currentUser;
@@ -33,6 +34,14 @@ class AppState extends ChangeNotifier {
       // Save user ID to SharedPreferences
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('current_user_id', user.id!);
+      
+      // Load and show interstitial ad on first login
+      InterstitialAdService.loadAd();
+      // Show ad after a short delay to ensure UI is ready
+      Future.delayed(const Duration(milliseconds: 500), () {
+        InterstitialAdService.showAdIfNeeded(isFirstLogin: true);
+      });
+      
       notifyListeners();
       return true;
     }
@@ -58,6 +67,14 @@ class AppState extends ChangeNotifier {
       // Save user ID to SharedPreferences
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('current_user_id', user.id!);
+      
+      // Load and show interstitial ad on first login (after registration)
+      InterstitialAdService.loadAd();
+      // Show ad after a short delay to ensure UI is ready
+      Future.delayed(const Duration(milliseconds: 500), () {
+        InterstitialAdService.showAdIfNeeded(isFirstLogin: true);
+      });
+      
       notifyListeners();
       return true;
     }
@@ -70,6 +87,8 @@ class AppState extends ChangeNotifier {
     // Clear user ID from SharedPreferences
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('current_user_id');
+    // Reset first login ad flag so next login will show ad
+    await InterstitialAdService.resetAdTiming();
     notifyListeners();
   }
 
