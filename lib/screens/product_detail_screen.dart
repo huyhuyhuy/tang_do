@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'dart:io';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../providers/app_state.dart';
 import '../services/supabase_product_service.dart';
 import '../services/supabase_auth_service.dart';
@@ -80,10 +81,16 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                 itemBuilder: (context, index) {
                   final image = _product!.images[index];
                   return image.isNotEmpty
-                      ? Image.network(
-                          image,
+                      ? CachedNetworkImage(
+                          imageUrl: image,
                           fit: BoxFit.cover,
-                          errorBuilder: (context, error, stackTrace) => Container(
+                          placeholder: (context, url) => Container(
+                            color: Colors.grey[200],
+                            child: const Center(
+                              child: CircularProgressIndicator(),
+                            ),
+                          ),
+                          errorWidget: (context, url, error) => Container(
                             color: Colors.grey[300],
                             child: const Icon(Icons.image, size: 64),
                           ),
@@ -201,7 +208,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                             backgroundColor: Colors.orange,
                             backgroundImage: _owner!.avatar != null && _owner!.avatar!.isNotEmpty
                                 ? (_owner!.avatar!.startsWith('http')
-                                    ? NetworkImage(_owner!.avatar!)
+                                    ? CachedNetworkImageProvider(_owner!.avatar!)
                                     : FileImage(File(_owner!.avatar!)) as ImageProvider)
                                 : null,
                             child: _owner!.avatar == null || _owner!.avatar!.isEmpty

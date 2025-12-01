@@ -3,8 +3,10 @@ import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as path;
+import 'package:cached_network_image/cached_network_image.dart';
 import '../models/user.dart';
 import '../services/supabase_auth_service.dart';
+import '../services/supabase_storage_service.dart';
 import '../utils/vietnam_addresses.dart';
 import '../providers/app_state.dart';
 import 'package:provider/provider.dart';
@@ -27,8 +29,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   final _districtTextController = TextEditingController();
   final _wardTextController = TextEditingController();
   final SupabaseAuthService _authService = SupabaseAuthService();
+  final SupabaseStorageService _storageService = SupabaseStorageService();
   final ImagePicker _imagePicker = ImagePicker();
   File? _avatarFile;
+  bool _avatarRemoved = false; // Track if avatar was removed
   bool _isLoading = false;
 
   // Address selection
@@ -55,35 +59,55 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       _wardTextController.text = _selectedWard!;
     }
     
-    if (widget.user.avatar != null && widget.user.avatar!.isNotEmpty) {
-      _avatarFile = File(widget.user.avatar!);
-    }
+    // Avatar is stored as URL in Supabase, not local file path
+    // We'll display it directly from URL in the UI
   }
 
   Future<void> _pickAvatar() async {
     try {
+      // Show dialog to choose camera or gallery
+      final ImageSource? source = await showDialog<ImageSource>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Chọn ảnh'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: const Icon(Icons.camera_alt),
+                title: const Text('Chụp ảnh'),
+                onTap: () => Navigator.pop(context, ImageSource.camera),
+              ),
+              ListTile(
+                leading: const Icon(Icons.photo_library),
+                title: const Text('Chọn từ thư viện'),
+                onTap: () => Navigator.pop(context, ImageSource.gallery),
+              ),
+            ],
+          ),
+        ),
+      );
+      
+      if (source == null) return;
+      
       final XFile? image = await _imagePicker.pickImage(
-        source: ImageSource.gallery,
+        source: source,
         imageQuality: 85,
         maxWidth: 512,
         maxHeight: 512,
       );
       
-      if (image != null) {
-        // Copy image to app directory
-        final appDir = await getApplicationDocumentsDirectory();
-        final avatarDir = Directory(path.join(appDir.path, 'avatars'));
-        if (!await avatarDir.exists()) {
-          await avatarDir.create(recursive: true);
-        }
-        final fileName = '${widget.user.id}_${DateTime.now().millisecondsSinceEpoch}.jpg';
-        final savedImage = await File(image.path).copy(
-          path.join(avatarDir.path, fileName),
-        );
+      if (image != null && mounted) {
+        // Wait a bit for UI to stabilize after camera closes
+        await Future.delayed(const Duration(milliseconds: 100));
         
-        setState(() {
-          _avatarFile = savedImage;
-        });
+        if (mounted) {
+          // Save as File for preview and later upload
+          setState(() {
+            _avatarFile = File(image.path);
+            _avatarRemoved = false; // Reset removed flag when new image is selected
+          });
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -100,6 +124,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   void _removeAvatar() {
     setState(() {
       _avatarFile = null;
+      _avatarRemoved = true;
     });
   }
 
@@ -119,6 +144,38 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
     setState(() => _isLoading = true);
 
+    // Handle avatar: upload new one or delete old one
+    String? avatarUrl;
+    
+    if (_avatarFile != null) {
+      // New avatar selected - delete old one if exists, then upload new
+      if (widget.user.avatar != null && widget.user.avatar!.isNotEmpty && widget.user.avatar!.startsWith('http')) {
+        await _storageService.deleteAvatarImage(widget.user.avatar!);
+      }
+      avatarUrl = await _storageService.uploadAvatarImage(_avatarFile!);
+      if (avatarUrl == null) {
+        setState(() => _isLoading = false);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Lỗi khi upload avatar'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+        return;
+      }
+    } else if (_avatarRemoved) {
+      // Avatar was removed - delete old one if exists
+      if (widget.user.avatar != null && widget.user.avatar!.isNotEmpty && widget.user.avatar!.startsWith('http')) {
+        await _storageService.deleteAvatarImage(widget.user.avatar!);
+      }
+      avatarUrl = null;
+    } else {
+      // Keep existing avatar
+      avatarUrl = widget.user.avatar;
+    }
+
     // Determine final district and ward values
     final finalDistrict = _selectedDistrict ?? _districtTextController.text.trim();
     final finalWard = _selectedWard ?? _wardTextController.text.trim();
@@ -137,7 +194,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       province: _selectedProvince,
       district: finalDistrict.isEmpty ? null : finalDistrict,
       ward: finalWard.isEmpty ? null : finalWard,
-      avatar: _avatarFile?.path,
+      avatar: avatarUrl,
     );
 
     final success = await _authService.updateUser(updatedUser);
@@ -168,10 +225,12 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       appBar: AppBar(
         title: const Text('Chỉnh sửa hồ sơ'),
       ),
-      body: Form(
-        key: _formKey,
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(16.0),
+      resizeToAvoidBottomInset: true,
+      body: SafeArea(
+        child: Form(
+          key: _formKey,
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(16.0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -185,10 +244,12 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                       backgroundImage: _avatarFile != null
                           ? FileImage(_avatarFile!)
                           : (widget.user.avatar != null && widget.user.avatar!.isNotEmpty
-                              ? FileImage(File(widget.user.avatar!))
+                              ? (widget.user.avatar!.startsWith('http')
+                                  ? CachedNetworkImageProvider(widget.user.avatar!)
+                                  : FileImage(File(widget.user.avatar!)) as ImageProvider)
                               : null),
                       child: _avatarFile == null &&
-                              (widget.user.avatar == null || widget.user.avatar!.isEmpty)
+                              (widget.user.avatar == null || widget.user.avatar!.isEmpty || _avatarRemoved)
                           ? Text(
                               widget.user.nickname[0].toUpperCase(),
                               style: const TextStyle(fontSize: 48, color: Colors.orange),
@@ -207,7 +268,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                         ),
                       ),
                     ),
-                    if (_avatarFile != null || (widget.user.avatar != null && widget.user.avatar!.isNotEmpty))
+                    if (_avatarFile != null || (widget.user.avatar != null && widget.user.avatar!.isNotEmpty && !_avatarRemoved))
                       Positioned(
                         top: 0,
                         right: 0,
@@ -409,6 +470,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               ),
             ],
           ),
+        ),
         ),
       ),
     );

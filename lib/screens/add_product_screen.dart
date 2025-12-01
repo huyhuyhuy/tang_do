@@ -6,10 +6,12 @@ import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as path;
 import '../providers/app_state.dart';
 import '../services/supabase_product_service.dart';
+import '../services/supabase_storage_service.dart';
 import '../models/product.dart';
 import '../utils/constants.dart';
 import '../utils/vietnam_addresses.dart';
 import '../widgets/banner_ad_widget.dart';
+import 'profile_screen.dart';
 
 class AddProductScreen extends StatefulWidget {
   final VoidCallback? onProductAdded;
@@ -32,6 +34,7 @@ class _AddProductScreenState extends State<AddProductScreen> with AutomaticKeepA
   final _districtTextController = TextEditingController();
   final _wardTextController = TextEditingController();
   final SupabaseProductService _productService = SupabaseProductService();
+  final SupabaseStorageService _storageService = SupabaseStorageService();
 
   String? _selectedCategory;
   String _selectedCondition = AppConstants.conditionUsed;
@@ -88,9 +91,11 @@ class _AddProductScreenState extends State<AddProductScreen> with AutomaticKeepA
       final XFile? image = await _imagePicker.pickImage(
         source: source,
         imageQuality: 85,
+        maxWidth: 1920,
+        maxHeight: 1920,
       );
       
-      if (image != null) {
+      if (image != null && mounted) {
         // Copy image to app directory
         final appDir = await getApplicationDocumentsDirectory();
         final imageDir = Directory(path.join(appDir.path, 'product_images'));
@@ -102,9 +107,14 @@ class _AddProductScreenState extends State<AddProductScreen> with AutomaticKeepA
           path.join(imageDir.path, fileName),
         );
         
-        setState(() {
-          _selectedImages[index] = savedImage;
-        });
+        // Wait a bit for UI to stabilize after camera closes
+        await Future.delayed(const Duration(milliseconds: 100));
+        
+        if (mounted) {
+          setState(() {
+            _selectedImages[index] = savedImage;
+          });
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -136,13 +146,102 @@ class _AddProductScreenState extends State<AddProductScreen> with AutomaticKeepA
       return;
     }
 
-    setState(() => _isLoading = true);
+    // Validate: Bắt buộc có ít nhất 1 ảnh
+    if (_selectedImages[0] == null && _selectedImages[1] == null && _selectedImages[2] == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Vui lòng thêm ít nhất 1 ảnh sản phẩm'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
 
     final appState = context.read<AppState>();
     if (appState.currentUser == null) return;
 
     final user = appState.currentUser!;
+    
+    // Check if user has address information
+    final hasAddress = (user.province != null && user.province!.isNotEmpty) ||
+        (_selectedProvince != null && _selectedProvince!.isNotEmpty);
+    
+    if (!hasAddress) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Vui lòng cập nhật địa chỉ trong hồ sơ trước khi đăng tin'),
+          backgroundColor: Colors.orange,
+          duration: Duration(seconds: 4),
+        ),
+      );
+      // Navigate to profile screen to update address
+      await Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => ProfileScreen(
+            userId: user.id!,
+            isOwnProfile: true,
+            showBottomNavBar: false,
+          ),
+        ),
+      );
+      return;
+    }
+
+    setState(() => _isLoading = true);
     final now = DateTime.now();
+
+    // Upload images to Supabase Storage
+    String? image1Url;
+    String? image2Url;
+    String? image3Url;
+
+    if (_selectedImages[0] != null) {
+      image1Url = await _storageService.uploadProductImage(_selectedImages[0]!);
+      if (image1Url == null) {
+        setState(() => _isLoading = false);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Lỗi khi upload ảnh 1'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+        return;
+      }
+    }
+
+    if (_selectedImages[1] != null) {
+      image2Url = await _storageService.uploadProductImage(_selectedImages[1]!);
+      if (image2Url == null) {
+        setState(() => _isLoading = false);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Lỗi khi upload ảnh 2'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+        return;
+      }
+    }
+
+    if (_selectedImages[2] != null) {
+      image3Url = await _storageService.uploadProductImage(_selectedImages[2]!);
+      if (image3Url == null) {
+        setState(() => _isLoading = false);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Lỗi khi upload ảnh 3'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+        return;
+      }
+    }
 
     final product = Product(
       userId: user.id!,
@@ -157,12 +256,13 @@ class _AddProductScreenState extends State<AddProductScreen> with AutomaticKeepA
           : _addressController.text.trim(),
       province: _useDefaultAddress ? user.province : _selectedProvince,
       district: _useDefaultAddress ? user.district : _selectedDistrict,
+      ward: _useDefaultAddress ? user.ward : _selectedWard,
       contactPhone: _useDefaultPhone ? user.phone : _contactPhoneController.text.trim().isEmpty
           ? null
           : _contactPhoneController.text.trim(),
-      image1: _selectedImages[0]?.path,
-      image2: _selectedImages[1]?.path,
-      image3: _selectedImages[2]?.path,
+      image1: image1Url,
+      image2: image2Url,
+      image3: image3Url,
       expiryDays: _expiryDays,
       createdAt: now,
       expiresAt: now.add(Duration(days: _expiryDays)),
@@ -172,14 +272,37 @@ class _AddProductScreenState extends State<AddProductScreen> with AutomaticKeepA
     setState(() => _isLoading = false);
 
     if (id != null && mounted) {
+      // Clear form after successful save
+      _nameController.clear();
+      _descriptionController.clear();
+      _addressController.clear();
+      _contactPhoneController.clear();
+      _districtTextController.clear();
+      _wardTextController.clear();
+      setState(() {
+        _selectedCategory = null;
+        _selectedCondition = AppConstants.conditionUsed;
+        _expiryDays = AppConstants.defaultExpiryDays;
+        _useDefaultAddress = true;
+        _useDefaultPhone = true;
+        _selectedImages = [null, null, null];
+        _selectedProvince = null;
+        _selectedDistrict = null;
+        _selectedWard = null;
+      });
+      
+      // Call callback to notify parent (MainScreen) to reload
       if (widget.onProductAdded != null) {
         widget.onProductAdded!();
       } else {
         Navigator.of(context).pop(true);
       }
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Đã thêm sản phẩm')),
-      );
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Đã thêm sản phẩm')),
+        );
+      }
     } else if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -200,11 +323,13 @@ class _AddProductScreenState extends State<AddProductScreen> with AutomaticKeepA
       appBar: AppBar(
         title: const Text('Thêm sản phẩm'),
       ),
+      resizeToAvoidBottomInset: true,
       bottomNavigationBar: widget.showBannerAd ? BannerAdWidget() : null,
-      body: Form(
-        key: _formKey,
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(16.0),
+      body: SafeArea(
+        child: Form(
+          key: _formKey,
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(16.0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -700,6 +825,7 @@ class _AddProductScreenState extends State<AddProductScreen> with AutomaticKeepA
               ),
             ],
           ),
+        ),
         ),
       ),
     );

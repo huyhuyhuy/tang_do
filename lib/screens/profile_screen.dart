@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'dart:io';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../providers/app_state.dart';
 import '../services/supabase_product_service.dart';
 import '../services/supabase_auth_service.dart';
@@ -32,10 +33,11 @@ class ProfileScreen extends StatefulWidget {
   });
 
   @override
-  State<ProfileScreen> createState() => _ProfileScreenState();
+  State<ProfileScreen> createState() => ProfileScreenState();
 }
 
-class _ProfileScreenState extends State<ProfileScreen> with AutomaticKeepAliveClientMixin {
+// Public State class to allow GlobalKey access
+class ProfileScreenState extends State<ProfileScreen> with AutomaticKeepAliveClientMixin {
   final SupabaseProductService _productService = SupabaseProductService();
   final SupabaseAuthService _authService = SupabaseAuthService();
 
@@ -62,6 +64,11 @@ class _ProfileScreenState extends State<ProfileScreen> with AutomaticKeepAliveCl
     }
 
     setState(() => _isLoading = false);
+  }
+
+  // Public method to refresh data from outside
+  void refreshProfile() {
+    _loadData();
   }
 
   List<Product> get _filteredProducts {
@@ -175,7 +182,7 @@ class _ProfileScreenState extends State<ProfileScreen> with AutomaticKeepAliveCl
                           backgroundColor: Colors.orange,
                           backgroundImage: _user!.avatar != null && _user!.avatar!.isNotEmpty
                               ? (_user!.avatar!.startsWith('http')
-                                  ? NetworkImage(_user!.avatar!)
+                                  ? CachedNetworkImageProvider(_user!.avatar!)
                                   : FileImage(File(_user!.avatar!)) as ImageProvider)
                               : null,
                           child: _user!.avatar == null || _user!.avatar!.isEmpty
@@ -255,20 +262,6 @@ class _ProfileScreenState extends State<ProfileScreen> with AutomaticKeepAliveCl
                       fontWeight: FontWeight.bold,
                     ),
                   ),
-                  if (isOwnProfile)
-                    IconButton(
-                      icon: const Icon(Icons.add_circle),
-                      onPressed: () async {
-                        final result = await Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (_) => const AddProductScreen(),
-                          ),
-                        );
-                        if (result == true) {
-                          _loadData();
-                        }
-                      },
-                    ),
                 ],
               ),
             ),
@@ -488,12 +481,18 @@ class _ProfileProductCardState extends State<_ProfileProductCard> {
                   widget.product.mainImage != null &&
                           widget.product.mainImage!.isNotEmpty
                       ? (widget.product.mainImage!.startsWith('http')
-                          ? Image.network(
-                              widget.product.mainImage!,
+                          ? CachedNetworkImage(
+                              imageUrl: widget.product.mainImage!,
                               fit: BoxFit.cover,
                               width: double.infinity,
                               height: double.infinity,
-                              errorBuilder: (context, error, stackTrace) => Container(
+                              placeholder: (context, url) => Container(
+                                color: Colors.grey[200],
+                                child: const Center(
+                                  child: CircularProgressIndicator(),
+                                ),
+                              ),
+                              errorWidget: (context, url, error) => Container(
                                 color: Colors.grey[300],
                                 child: const Icon(Icons.image, size: 48),
                               ),

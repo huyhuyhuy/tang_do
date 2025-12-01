@@ -256,20 +256,69 @@ CREATE TRIGGER trigger_notify_on_review
   EXECUTE FUNCTION notify_product_owner_on_review();
 
 -- ============================================
--- 8. STORAGE BUCKETS (Optional - for future use)
+-- 8. STORAGE BUCKETS
 -- ============================================
--- Note: For simple testing, images can be stored as URLs in database
--- Uncomment below if you want to use Supabase Storage
+-- Simple version: public buckets, no authentication required
 
--- -- Create avatars bucket
--- INSERT INTO storage.buckets (id, name, public)
--- VALUES ('avatars', 'avatars', true)
--- ON CONFLICT (id) DO NOTHING;
+-- Create avatars bucket (public, anyone can upload/read/delete)
+INSERT INTO storage.buckets (id, name, public)
+VALUES ('avatars', 'avatars', true)
+ON CONFLICT (id) DO NOTHING;
 
--- -- Create product-images bucket
--- INSERT INTO storage.buckets (id, name, public)
--- VALUES ('product-images', 'product-images', true)
--- ON CONFLICT (id) DO NOTHING;
+-- Create product-images bucket (public, anyone can upload/read/delete)
+INSERT INTO storage.buckets (id, name, public)
+VALUES ('product-images', 'product-images', true)
+ON CONFLICT (id) DO NOTHING;
+
+-- ============================================
+-- 9. STORAGE POLICIES (Allow public access)
+-- ============================================
+-- Simple policies: allow anyone to upload, read, and delete
+-- No authentication required
+
+-- Policies for avatars bucket
+-- Allow anyone to upload
+DROP POLICY IF EXISTS "Allow public upload avatars" ON storage.objects;
+CREATE POLICY "Allow public upload avatars"
+ON storage.objects FOR INSERT
+TO public
+WITH CHECK (bucket_id = 'avatars');
+
+-- Allow anyone to read
+DROP POLICY IF EXISTS "Allow public read avatars" ON storage.objects;
+CREATE POLICY "Allow public read avatars"
+ON storage.objects FOR SELECT
+TO public
+USING (bucket_id = 'avatars');
+
+-- Allow anyone to delete
+DROP POLICY IF EXISTS "Allow public delete avatars" ON storage.objects;
+CREATE POLICY "Allow public delete avatars"
+ON storage.objects FOR DELETE
+TO public
+USING (bucket_id = 'avatars');
+
+-- Policies for product-images bucket
+-- Allow anyone to upload
+DROP POLICY IF EXISTS "Allow public upload product-images" ON storage.objects;
+CREATE POLICY "Allow public upload product-images"
+ON storage.objects FOR INSERT
+TO public
+WITH CHECK (bucket_id = 'product-images');
+
+-- Allow anyone to read
+DROP POLICY IF EXISTS "Allow public read product-images" ON storage.objects;
+CREATE POLICY "Allow public read product-images"
+ON storage.objects FOR SELECT
+TO public
+USING (bucket_id = 'product-images');
+
+-- Allow anyone to delete
+DROP POLICY IF EXISTS "Allow public delete product-images" ON storage.objects;
+CREATE POLICY "Allow public delete product-images"
+ON storage.objects FOR DELETE
+TO public
+USING (bucket_id = 'product-images');
 
 -- ============================================
 -- END OF SCHEMA

@@ -32,16 +32,32 @@ DROP TABLE IF EXISTS public.follows CASCADE;
 DROP TABLE IF EXISTS public.users CASCADE;
 
 -- ============================================
--- 4. DROP STORAGE BUCKETS
+-- 4. DELETE STORAGE OBJECTS (files in buckets)
 -- ============================================
--- Note: This requires admin privileges
--- You may need to delete these manually from Supabase Dashboard
--- or use the Supabase API
+-- Delete all files in buckets before deleting buckets
+-- This is required because of foreign key constraint
+DELETE FROM storage.objects WHERE bucket_id = 'avatars';
+DELETE FROM storage.objects WHERE bucket_id = 'product-images';
+
+-- ============================================
+-- 5. DROP STORAGE POLICIES
+-- ============================================
+DROP POLICY IF EXISTS "Allow public upload avatars" ON storage.objects;
+DROP POLICY IF EXISTS "Allow public read avatars" ON storage.objects;
+DROP POLICY IF EXISTS "Allow public delete avatars" ON storage.objects;
+DROP POLICY IF EXISTS "Allow public upload product-images" ON storage.objects;
+DROP POLICY IF EXISTS "Allow public read product-images" ON storage.objects;
+DROP POLICY IF EXISTS "Allow public delete product-images" ON storage.objects;
+
+-- ============================================
+-- 6. DROP STORAGE BUCKETS
+-- ============================================
+-- Now we can safely delete buckets after all objects are removed
 DELETE FROM storage.buckets WHERE id = 'avatars';
 DELETE FROM storage.buckets WHERE id = 'product-images';
 
 -- ============================================
--- 5. DROP EXTENSIONS (if you created any custom ones)
+-- 7. DROP EXTENSIONS (if you created any custom ones)
 -- ============================================
 -- Uncomment if needed
 -- DROP EXTENSION IF EXISTS <extension_name> CASCADE;

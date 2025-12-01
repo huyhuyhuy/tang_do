@@ -30,6 +30,7 @@ dependencies:
   # UI
   cached_network_image: ^3.3.0
   image_picker: ^1.0.7
+  flutter_image_compress: ^2.3.0
   
   # Icons
   flutter_svg: ^2.0.9

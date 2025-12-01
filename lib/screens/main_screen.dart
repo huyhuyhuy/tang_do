@@ -28,6 +28,7 @@ class MainScreenWithTab extends MainScreen {
 class _MainScreenState extends State<MainScreen> {
   late int _currentIndex;
   final GlobalKey<MainFeedScreenState> _mainFeedKey = GlobalKey<MainFeedScreenState>();
+  final GlobalKey<ProfileScreenWrapperState> _profileScreenKey = GlobalKey<ProfileScreenWrapperState>();
 
   @override
   void initState() {
@@ -39,7 +40,7 @@ class _MainScreenState extends State<MainScreen> {
     MainFeedScreen(key: _mainFeedKey),
     const AddProductScreenWrapper(),
     const NotificationsScreen(),
-    const ProfileScreenWrapper(),
+    ProfileScreenWrapper(key: _profileScreenKey),
   ];
 
   void switchToTab(int index) {
@@ -71,6 +72,10 @@ class _MainScreenState extends State<MainScreen> {
               // Reset search khi chuyển về tab Trang chủ
               if (index == 0 && _mainFeedKey.currentState != null) {
                 _mainFeedKey.currentState!.resetSearch();
+              }
+              // Refresh profile screen khi chuyển về tab Hồ sơ
+              if (index == 3 && _profileScreenKey.currentState != null) {
+                _profileScreenKey.currentState!.refreshProfile();
               }
             },
             destinations: [
@@ -114,10 +119,14 @@ class _AddProductScreenWrapperState extends State<AddProductScreenWrapper> {
   Widget build(BuildContext context) {
     return AddProductScreen(
       onProductAdded: () {
-        // Khi thêm sản phẩm thành công, chuyển về tab Trang chủ
+        // Khi thêm sản phẩm thành công, chuyển về tab Trang chủ và reload
         final mainScreenState = context.findAncestorStateOfType<_MainScreenState>();
         if (mainScreenState != null) {
           mainScreenState.switchToTab(0);
+          // Reload products after switching to home tab
+          Future.delayed(const Duration(milliseconds: 300), () {
+            mainScreenState._mainFeedKey.currentState?.refreshProducts();
+          });
         }
       },
       showBannerAd: false, // Không hiển thị banner ad vì MainScreen đã có
@@ -125,8 +134,19 @@ class _AddProductScreenWrapperState extends State<AddProductScreenWrapper> {
   }
 }
 
-class ProfileScreenWrapper extends StatelessWidget {
+class ProfileScreenWrapper extends StatefulWidget {
   const ProfileScreenWrapper({super.key});
+
+  @override
+  State<ProfileScreenWrapper> createState() => ProfileScreenWrapperState();
+}
+
+class ProfileScreenWrapperState extends State<ProfileScreenWrapper> {
+  final GlobalKey<ProfileScreenState> _profileKey = GlobalKey<ProfileScreenState>();
+
+  void refreshProfile() {
+    _profileKey.currentState?.refreshProfile();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -134,6 +154,7 @@ class ProfileScreenWrapper extends StatelessWidget {
       builder: (context, appState, _) {
         if (appState.currentUser != null) {
           return ProfileScreen(
+            key: _profileKey,
             userId: appState.currentUser!.id!,
             showBottomNavBar: false, // Không hiển thị bottom nav bar vì MainScreen đã có
           );

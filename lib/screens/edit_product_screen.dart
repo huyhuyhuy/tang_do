@@ -4,8 +4,10 @@ import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as path;
+import 'package:cached_network_image/cached_network_image.dart';
 import '../providers/app_state.dart';
 import '../services/supabase_product_service.dart';
+import '../services/supabase_storage_service.dart';
 import '../models/product.dart';
 import '../utils/constants.dart';
 import '../utils/vietnam_addresses.dart';
@@ -28,6 +30,7 @@ class _EditProductScreenState extends State<EditProductScreen> {
   final _districtTextController = TextEditingController();
   final _wardTextController = TextEditingController();
   final SupabaseProductService _productService = SupabaseProductService();
+  final SupabaseStorageService _storageService = SupabaseStorageService();
   final ImagePicker _imagePicker = ImagePicker();
 
   String? _selectedCategory;
@@ -77,26 +80,9 @@ class _EditProductScreenState extends State<EditProductScreen> {
   }
 
   Future<void> _loadImages() async {
-    final images = [
-      widget.product.image1,
-      widget.product.image2,
-      widget.product.image3,
-    ];
-    
-    for (int i = 0; i < images.length; i++) {
-      if (images[i] != null && images[i]!.isNotEmpty) {
-        // Check if it's a local file path
-        if (!images[i]!.startsWith('http')) {
-          final file = File(images[i]!);
-          if (await file.exists()) {
-            setState(() {
-              _selectedImages[i] = file;
-            });
-          }
-        }
-        // For network images, we'll display them directly in the UI
-      }
-    }
+    // Images are stored as URLs in Supabase Storage
+    // We don't need to load them as local files
+    // They will be displayed directly from URLs in the UI
   }
   
   String? _getImageUrl(int index) {
@@ -158,9 +144,11 @@ class _EditProductScreenState extends State<EditProductScreen> {
       final XFile? image = await _imagePicker.pickImage(
         source: source,
         imageQuality: 85,
+        maxWidth: 1920,
+        maxHeight: 1920,
       );
       
-      if (image != null) {
+      if (image != null && mounted) {
         // Copy image to app directory
         final appDir = await getApplicationDocumentsDirectory();
         final imageDir = Directory(path.join(appDir.path, 'product_images'));
@@ -172,10 +160,15 @@ class _EditProductScreenState extends State<EditProductScreen> {
           path.join(imageDir.path, fileName),
         );
         
-        setState(() {
-          _selectedImages[index] = savedImage;
-          _imageRemoved[index] = false; // Reset removed flag when new image is selected
-        });
+        // Wait a bit for UI to stabilize after camera closes
+        await Future.delayed(const Duration(milliseconds: 100));
+        
+        if (mounted) {
+          setState(() {
+            _selectedImages[index] = savedImage;
+            _imageRemoved[index] = false; // Reset removed flag when new image is selected
+          });
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -216,6 +209,101 @@ class _EditProductScreenState extends State<EditProductScreen> {
     final user = appState.currentUser!;
     final now = DateTime.now();
 
+    // Handle images: delete old ones if replaced/removed, upload new ones
+    String? image1Url;
+    String? image2Url;
+    String? image3Url;
+
+    final originalImages = [
+      widget.product.image1,
+      widget.product.image2,
+      widget.product.image3,
+    ];
+
+    // Process image1
+    if (_selectedImages[0] != null) {
+      // New image selected - delete old one if exists, then upload new
+      if (originalImages[0] != null && originalImages[0]!.startsWith('http')) {
+        await _storageService.deleteProductImage(originalImages[0]!);
+      }
+      image1Url = await _storageService.uploadProductImage(_selectedImages[0]!);
+      if (image1Url == null) {
+        setState(() => _isLoading = false);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Lỗi khi upload ảnh 1'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+        return;
+      }
+    } else if (_imageRemoved[0]) {
+      // Image was removed - delete old one if exists
+      if (originalImages[0] != null && originalImages[0]!.startsWith('http')) {
+        await _storageService.deleteProductImage(originalImages[0]!);
+      }
+      image1Url = null;
+    } else {
+      // Keep existing image
+      image1Url = originalImages[0];
+    }
+
+    // Process image2
+    if (_selectedImages[1] != null) {
+      if (originalImages[1] != null && originalImages[1]!.startsWith('http')) {
+        await _storageService.deleteProductImage(originalImages[1]!);
+      }
+      image2Url = await _storageService.uploadProductImage(_selectedImages[1]!);
+      if (image2Url == null) {
+        setState(() => _isLoading = false);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Lỗi khi upload ảnh 2'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+        return;
+      }
+    } else if (_imageRemoved[1]) {
+      if (originalImages[1] != null && originalImages[1]!.startsWith('http')) {
+        await _storageService.deleteProductImage(originalImages[1]!);
+      }
+      image2Url = null;
+    } else {
+      image2Url = originalImages[1];
+    }
+
+    // Process image3
+    if (_selectedImages[2] != null) {
+      if (originalImages[2] != null && originalImages[2]!.startsWith('http')) {
+        await _storageService.deleteProductImage(originalImages[2]!);
+      }
+      image3Url = await _storageService.uploadProductImage(_selectedImages[2]!);
+      if (image3Url == null) {
+        setState(() => _isLoading = false);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Lỗi khi upload ảnh 3'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+        return;
+      }
+    } else if (_imageRemoved[2]) {
+      if (originalImages[2] != null && originalImages[2]!.startsWith('http')) {
+        await _storageService.deleteProductImage(originalImages[2]!);
+      }
+      image3Url = null;
+    } else {
+      image3Url = originalImages[2];
+    }
+
     final updatedProduct = widget.product.copyWith(
       name: _nameController.text.trim(),
       description: _descriptionController.text.trim().isEmpty
@@ -228,13 +316,13 @@ class _EditProductScreenState extends State<EditProductScreen> {
           : _addressController.text.trim(),
       province: _useDefaultAddress ? user.province : _selectedProvince,
       district: _useDefaultAddress ? user.district : _selectedDistrict,
-      ward: _useDefaultAddress ? null : _selectedWard,
+      ward: _useDefaultAddress ? user.ward : _selectedWard,
       contactPhone: _useDefaultPhone ? user.phone : _contactPhoneController.text.trim().isEmpty
           ? null
           : _contactPhoneController.text.trim(),
-      image1: _selectedImages[0]?.path ?? (_imageRemoved[0] ? null : widget.product.image1),
-      image2: _selectedImages[1]?.path ?? (_imageRemoved[1] ? null : widget.product.image2),
-      image3: _selectedImages[2]?.path ?? (_imageRemoved[2] ? null : widget.product.image3),
+      image1: image1Url,
+      image2: image2Url,
+      image3: image3Url,
       expiryDays: _expiryDays,
       expiresAt: now.add(Duration(days: _expiryDays)),
     );
@@ -278,11 +366,13 @@ class _EditProductScreenState extends State<EditProductScreen> {
       appBar: AppBar(
         title: const Text('Chỉnh sửa sản phẩm'),
       ),
-      body: Form(
-        key: _formKey,
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
+      resizeToAvoidBottomInset: true,
+      body: SafeArea(
+        child: Form(
+          key: _formKey,
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               TextFormField(
@@ -438,10 +528,16 @@ class _EditProductScreenState extends State<EditProductScreen> {
                                 : _getImageUrl(index) != null
                                     ? ClipRRect(
                                         borderRadius: BorderRadius.circular(8),
-                                        child: Image.network(
-                                          _getImageUrl(index)!,
+                                        child: CachedNetworkImage(
+                                          imageUrl: _getImageUrl(index)!,
                                           fit: BoxFit.cover,
-                                          errorBuilder: (context, error, stackTrace) => InkWell(
+                                          placeholder: (context, url) => Container(
+                                            color: Colors.grey[200],
+                                            child: const Center(
+                                              child: CircularProgressIndicator(),
+                                            ),
+                                          ),
+                                          errorWidget: (context, url, error) => InkWell(
                                             onTap: () => _pickImage(index),
                                             child: const Column(
                                               mainAxisAlignment: MainAxisAlignment.center,
@@ -798,6 +894,7 @@ class _EditProductScreenState extends State<EditProductScreen> {
               ),
             ],
           ),
+        ),
         ),
       ),
     );

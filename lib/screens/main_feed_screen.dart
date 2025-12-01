@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'dart:io';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../providers/app_state.dart';
 import '../services/supabase_product_service.dart';
 import '../services/supabase_notification_service.dart';
@@ -32,6 +33,11 @@ class MainFeedScreenState extends State<MainFeedScreen> with AutomaticKeepAliveC
       _selectedWard = null;
       _selectedCondition = null;
     });
+    _loadProducts();
+  }
+
+  /// Public method to refresh products list
+  void refreshProducts() {
     _loadProducts();
   }
   final SupabaseProductService _productService = SupabaseProductService();
@@ -162,7 +168,7 @@ class MainFeedScreenState extends State<MainFeedScreen> with AutomaticKeepAliveC
             child: TextField(
               controller: _searchController,
               decoration: InputDecoration(
-                hintText: 'Search...',
+                hintText: 'Tìm kiếm...',
                 hintStyle: TextStyle(color: Theme.of(context).brightness == Brightness.dark ? Colors.white70 : Colors.black54),
                 prefixIcon: Icon(Icons.search, color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black54, size: 18),
                 filled: true,
@@ -305,12 +311,18 @@ class _ProductCardState extends State<_ProductCard> {
                 children: [
                   widget.product.mainImage != null && widget.product.mainImage!.isNotEmpty
                       ? (widget.product.mainImage!.startsWith('http')
-                          ? Image.network(
-                              widget.product.mainImage!,
+                          ? CachedNetworkImage(
+                              imageUrl: widget.product.mainImage!,
                               fit: BoxFit.cover,
                               width: double.infinity,
                               height: double.infinity,
-                              errorBuilder: (context, error, stackTrace) => Container(
+                              placeholder: (context, url) => Container(
+                                color: Colors.grey[200],
+                                child: const Center(
+                                  child: CircularProgressIndicator(),
+                                ),
+                              ),
+                              errorWidget: (context, url, error) => Container(
                                 color: Colors.grey[300],
                                 child: const Icon(Icons.image, size: 48),
                               ),
