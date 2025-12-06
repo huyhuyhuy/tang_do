@@ -318,10 +318,11 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               TextFormField(
                 controller: _nameController,
                 decoration: const InputDecoration(
-                  labelText: 'Tên',
+                  labelText: 'Họ và Tên',
                   border: OutlineInputBorder(),
                   prefixIcon: Icon(Icons.person_outline),
                 ),
+                textCapitalization: TextCapitalization.words,
               ),
               const SizedBox(height: 16),
               TextFormField(

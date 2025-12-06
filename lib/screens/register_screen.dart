@@ -16,7 +16,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _formKey = GlobalKey<FormState>();
   final _phoneController = TextEditingController();
   final _nicknameController = TextEditingController();
-  final _nameController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
@@ -29,7 +28,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
   void dispose() {
     _phoneController.dispose();
     _nicknameController.dispose();
-    _nameController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
@@ -76,7 +74,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       phone: _phoneController.text.trim(),
       nickname: _nicknameController.text.trim(),
       password: _passwordController.text,
-      name: _nameController.text.trim().isEmpty ? null : _nameController.text.trim(),
+      name: _nicknameController.text.trim(), // Tự động gán name = nickname
       email: _emailController.text.trim().isEmpty ? null : _emailController.text.trim(),
     );
 
@@ -147,19 +145,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     }
                     return null;
                   },
-                ),
-                const SizedBox(height: 16),
-                TextFormField(
-                  controller: _nameController,
-                  decoration: const InputDecoration(
-                    labelText: 'Họ và tên',
-                    border: OutlineInputBorder(),
-                    prefixIcon: Icon(Icons.person_outline),
-                  ),
-                  textCapitalization: TextCapitalization.words,
-                  inputFormatters: [
-                    FilteringTextInputFormatter.allow(RegExp(r'[a-zA-ZÀ-ỹ\s]')),
-                  ],
                 ),
                 const SizedBox(height: 16),
                 TextFormField(
