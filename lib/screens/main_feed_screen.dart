@@ -10,6 +10,7 @@ import '../models/product.dart';
 import '../utils/constants.dart';
 import '../utils/vietnam_addresses.dart';
 import '../widgets/banner_ad_widget.dart';
+import '../widgets/searchable_address_dropdown.dart';
 import 'product_detail_screen.dart';
 
 class MainFeedScreen extends StatefulWidget {
@@ -512,24 +513,10 @@ class _FilterBottomSheetState extends State<_FilterBottomSheet> {
                     style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
                   ),
                   const SizedBox(height: 8),
-                  DropdownButtonFormField<String>(
+                  SearchableAddressDropdown(
+                    type: AddressType.province,
                     value: _province,
-                    decoration: const InputDecoration(
-                      border: OutlineInputBorder(),
-                      prefixIcon: Icon(Icons.map),
-                    ),
-                    items: [
-                      const DropdownMenuItem<String>(
-                        value: null,
-                        child: Text('Tất cả'),
-                      ),
-                      ...VietnamAddresses.provinces.map((province) {
-                        return DropdownMenuItem<String>(
-                          value: province,
-                          child: Text(province),
-                        );
-                      }),
-                    ],
+                    allOptionText: 'Tất cả',
                     onChanged: (value) {
                       setState(() {
                         _province = value;
@@ -544,25 +531,11 @@ class _FilterBottomSheetState extends State<_FilterBottomSheet> {
                     style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
                   ),
                   const SizedBox(height: 8),
-                  DropdownButtonFormField<String>(
+                  SearchableAddressDropdown(
+                    type: AddressType.district,
                     value: _district,
-                    decoration: const InputDecoration(
-                      border: OutlineInputBorder(),
-                      prefixIcon: Icon(Icons.location_city),
-                    ),
-                    items: [
-                      const DropdownMenuItem<String>(
-                        value: null,
-                        child: Text('Tất cả'),
-                      ),
-                      if (_province != null)
-                        ...VietnamAddresses.getDistrictsByProvince(_province!).map((district) {
-                          return DropdownMenuItem<String>(
-                            value: district,
-                            child: Text(district),
-                          );
-                        }),
-                    ],
+                    province: _province,
+                    allOptionText: 'Tất cả',
                     onChanged: _province == null
                         ? null
                         : (value) {
@@ -578,25 +551,11 @@ class _FilterBottomSheetState extends State<_FilterBottomSheet> {
                     style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
                   ),
                   const SizedBox(height: 8),
-                  DropdownButtonFormField<String>(
+                  SearchableAddressDropdown(
+                    type: AddressType.ward,
                     value: _ward,
-                    decoration: const InputDecoration(
-                      border: OutlineInputBorder(),
-                      prefixIcon: Icon(Icons.location_on),
-                    ),
-                    items: [
-                      const DropdownMenuItem<String>(
-                        value: null,
-                        child: Text('Tất cả'),
-                      ),
-                      if (_district != null)
-                        ...VietnamAddresses.getWardsByDistrict(_district!).map((ward) {
-                          return DropdownMenuItem<String>(
-                            value: ward,
-                            child: Text(ward),
-                          );
-                        }),
-                    ],
+                    district: _district,
+                    allOptionText: 'Tất cả',
                     onChanged: _district == null
                         ? null
                         : (value) {

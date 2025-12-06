@@ -11,6 +11,7 @@ import '../models/product.dart';
 import '../utils/constants.dart';
 import '../utils/vietnam_addresses.dart';
 import '../widgets/banner_ad_widget.dart';
+import '../widgets/searchable_address_dropdown.dart';
 import 'profile_screen.dart';
 
 class AddProductScreen extends StatefulWidget {
@@ -617,24 +618,9 @@ class _AddProductScreenState extends State<AddProductScreen> with AutomaticKeepA
                 const SizedBox(height: 16),
                 const Text('Tỉnh/Thành phố *'),
                 const SizedBox(height: 8),
-                DropdownButtonFormField<String>(
+                SearchableAddressDropdown(
+                  type: AddressType.province,
                   value: _selectedProvince,
-                  decoration: const InputDecoration(
-                    border: OutlineInputBorder(),
-                    prefixIcon: Icon(Icons.map),
-                  ),
-                  items: [
-                    const DropdownMenuItem<String>(
-                      value: null,
-                      child: Text('Chọn Tỉnh/Thành phố'),
-                    ),
-                    ...VietnamAddresses.provinces.toSet().map((province) {
-                      return DropdownMenuItem<String>(
-                        value: province,
-                        child: Text(province),
-                      );
-                    }),
-                  ],
                   onChanged: (value) {
                     setState(() {
                       _selectedProvince = value;
@@ -650,27 +636,21 @@ class _AddProductScreenState extends State<AddProductScreen> with AutomaticKeepA
                     }
                     return null;
                   },
+                  isRequired: true,
                 ),
                 const SizedBox(height: 16),
                 const Text('Quận/Huyện *'),
                 const SizedBox(height: 8),
                 _selectedProvince == null
-                    ? DropdownButtonFormField<String>(
+                    ? SearchableAddressDropdown(
+                        type: AddressType.district,
                         value: null,
-                        decoration: const InputDecoration(
-                          border: OutlineInputBorder(),
-                          prefixIcon: Icon(Icons.location_city),
-                        ),
-                        items: const [
-                          DropdownMenuItem<String>(
-                            value: null,
-                            child: Text('Chọn Tỉnh/Thành phố trước'),
-                          ),
-                        ],
+                        province: null,
                         onChanged: null,
                         validator: (value) {
                           return 'Vui lòng chọn Tỉnh/Thành phố trước';
                         },
+                        isRequired: true,
                       )
                     : VietnamAddresses.getDistrictsByProvince(_selectedProvince!).isEmpty
                         ? TextFormField(
@@ -695,24 +675,10 @@ class _AddProductScreenState extends State<AddProductScreen> with AutomaticKeepA
                               return null;
                             },
                           )
-                        : DropdownButtonFormField<String>(
+                        : SearchableAddressDropdown(
+                            type: AddressType.district,
                             value: _selectedDistrict,
-                            decoration: const InputDecoration(
-                              border: OutlineInputBorder(),
-                              prefixIcon: Icon(Icons.location_city),
-                            ),
-                            items: [
-                              const DropdownMenuItem<String>(
-                                value: null,
-                                child: Text('Chọn Quận/Huyện'),
-                              ),
-                              ...VietnamAddresses.getDistrictsByProvince(_selectedProvince!).map((district) {
-                                return DropdownMenuItem<String>(
-                                  value: district,
-                                  child: Text(district),
-                                );
-                              }),
-                            ],
+                            province: _selectedProvince,
                             onChanged: (value) {
                               setState(() {
                                 _selectedDistrict = value;
@@ -725,23 +691,16 @@ class _AddProductScreenState extends State<AddProductScreen> with AutomaticKeepA
                               }
                               return null;
                             },
+                            isRequired: true,
                           ),
                 const SizedBox(height: 16),
                 const Text('Phường/Xã'),
                 const SizedBox(height: 8),
                 _selectedDistrict == null
-                    ? DropdownButtonFormField<String>(
+                    ? SearchableAddressDropdown(
+                        type: AddressType.ward,
                         value: null,
-                        decoration: const InputDecoration(
-                          border: OutlineInputBorder(),
-                          prefixIcon: Icon(Icons.location_on),
-                        ),
-                        items: const [
-                          DropdownMenuItem<String>(
-                            value: null,
-                            child: Text('Chọn Quận/Huyện trước'),
-                          ),
-                        ],
+                        district: null,
                         onChanged: null,
                       )
                     : VietnamAddresses.getWardsByDistrict(_selectedDistrict!).isEmpty
@@ -759,24 +718,10 @@ class _AddProductScreenState extends State<AddProductScreen> with AutomaticKeepA
                               });
                             },
                           )
-                        : DropdownButtonFormField<String>(
+                        : SearchableAddressDropdown(
+                            type: AddressType.ward,
                             value: _selectedWard,
-                            decoration: const InputDecoration(
-                              border: OutlineInputBorder(),
-                              prefixIcon: Icon(Icons.location_on),
-                            ),
-                            items: [
-                              const DropdownMenuItem<String>(
-                                value: null,
-                                child: Text('Chọn Phường/Xã (tùy chọn)'),
-                              ),
-                              ...VietnamAddresses.getWardsByDistrict(_selectedDistrict!).map((ward) {
-                                return DropdownMenuItem<String>(
-                                  value: ward,
-                                  child: Text(ward),
-                                );
-                              }),
-                            ],
+                            district: _selectedDistrict,
                             onChanged: (value) {
                               setState(() {
                                 _selectedWard = value;

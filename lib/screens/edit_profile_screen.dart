@@ -8,6 +8,7 @@ import '../models/user.dart';
 import '../services/supabase_auth_service.dart';
 import '../services/supabase_storage_service.dart';
 import '../utils/vietnam_addresses.dart';
+import '../widgets/searchable_address_dropdown.dart';
 import '../providers/app_state.dart';
 import 'package:provider/provider.dart';
 
@@ -343,26 +344,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               ),
               const SizedBox(height: 16),
               // Province dropdown
-              DropdownButtonFormField<String>(
-                // ignore: deprecated_member_use
+              SearchableAddressDropdown(
+                type: AddressType.province,
                 value: _selectedProvince,
-                decoration: const InputDecoration(
-                  labelText: 'Tỉnh/Thành phố',
-                  border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.map),
-                ),
-                items: [
-                  const DropdownMenuItem<String>(
-                    value: null,
-                    child: Text('Chọn Tỉnh/Thành phố'),
-                  ),
-                  ...VietnamAddresses.provinces.toSet().toList().map((province) {
-                    return DropdownMenuItem<String>(
-                      value: province,
-                      child: Text(province),
-                    );
-                  }),
-                ],
                 onChanged: (value) {
                   setState(() {
                     _selectedProvince = value;
@@ -376,26 +360,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               const SizedBox(height: 16),
               // District dropdown or text field
               _selectedProvince != null && VietnamAddresses.getDistrictsByProvince(_selectedProvince!).isNotEmpty
-                  ? DropdownButtonFormField<String>(
-                      // ignore: deprecated_member_use
+                  ? SearchableAddressDropdown(
+                      type: AddressType.district,
                       value: _selectedDistrict,
-                      decoration: const InputDecoration(
-                        labelText: 'Quận/Huyện',
-                        border: OutlineInputBorder(),
-                        prefixIcon: Icon(Icons.location_city),
-                      ),
-                      items: [
-                        const DropdownMenuItem<String>(
-                          value: null,
-                          child: Text('Chọn Quận/Huyện'),
-                        ),
-                        ...VietnamAddresses.getDistrictsByProvince(_selectedProvince!).toSet().toList().map((district) {
-                          return DropdownMenuItem<String>(
-                            value: district,
-                            child: Text(district),
-                          );
-                        }),
-                      ],
+                      province: _selectedProvince,
                       onChanged: (value) {
                         setState(() {
                           _selectedDistrict = value;
@@ -415,26 +383,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               const SizedBox(height: 16),
               // Ward dropdown or text field
               _selectedDistrict != null && VietnamAddresses.getWardsByDistrict(_selectedDistrict!).isNotEmpty
-                  ? DropdownButtonFormField<String>(
-                      // ignore: deprecated_member_use
+                  ? SearchableAddressDropdown(
+                      type: AddressType.ward,
                       value: _selectedWard,
-                      decoration: const InputDecoration(
-                        labelText: 'Phường/Xã',
-                        border: OutlineInputBorder(),
-                        prefixIcon: Icon(Icons.location_on),
-                      ),
-                      items: [
-                        const DropdownMenuItem<String>(
-                          value: null,
-                          child: Text('Chọn Phường/Xã'),
-                        ),
-                        ...VietnamAddresses.getWardsByDistrict(_selectedDistrict!).toSet().toList().map((ward) {
-                          return DropdownMenuItem<String>(
-                            value: ward,
-                            child: Text(ward),
-                          );
-                        }),
-                      ],
+                      district: _selectedDistrict,
                       onChanged: (value) {
                         setState(() {
                           _selectedWard = value;
