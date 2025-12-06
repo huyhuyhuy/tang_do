@@ -38,7 +38,7 @@ class AppState extends ChangeNotifier {
       // Load and show interstitial ad on first login
       InterstitialAdService.loadAd();
       // Show ad after a short delay to ensure UI is ready
-      Future.delayed(const Duration(milliseconds: 500), () {
+      Future.delayed(const Duration(milliseconds: 1500), () {
         InterstitialAdService.showAdIfNeeded(isFirstLogin: true);
       });
       
@@ -71,7 +71,7 @@ class AppState extends ChangeNotifier {
       // Load and show interstitial ad on first login (after registration)
       InterstitialAdService.loadAd();
       // Show ad after a short delay to ensure UI is ready
-      Future.delayed(const Duration(milliseconds: 500), () {
+      Future.delayed(const Duration(milliseconds: 1500), () {
         InterstitialAdService.showAdIfNeeded(isFirstLogin: true);
       });
       

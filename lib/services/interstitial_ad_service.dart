@@ -116,7 +116,7 @@ class InterstitialAdService {
     if (!_isAdLoaded || _interstitialAd == null) {
       await loadAd();
       // Wait a bit for ad to load
-      await Future.delayed(const Duration(milliseconds: 500));
+      await Future.delayed(const Duration(milliseconds: 1500));
     }
 
     // Show ad if loaded

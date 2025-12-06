@@ -74,7 +74,7 @@ class _AuthWrapperState extends State<AuthWrapper> {
         // Load ad if not already loaded
         await InterstitialAdService.loadAd();
         // Wait a bit for ad to load
-        await Future.delayed(const Duration(milliseconds: 500));
+        await Future.delayed(const Duration(milliseconds: 1500));
         // Show ad (not first login, so isFirstLogin: false)
         if (mounted) {
           InterstitialAdService.showAdIfNeeded(isFirstLogin: false);
