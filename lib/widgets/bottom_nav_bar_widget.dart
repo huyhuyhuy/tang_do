@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import '../services/supabase_notification_service.dart';
+import 'package:provider/provider.dart';
+import '../providers/app_state.dart';
 
-class BottomNavBarWidget extends StatelessWidget {
+class BottomNavBarWidget extends StatefulWidget {
   final int currentIndex;
   final Function(int) onDestinationSelected;
 
@@ -11,33 +14,97 @@ class BottomNavBarWidget extends StatelessWidget {
   });
 
   @override
+  State<BottomNavBarWidget> createState() => _BottomNavBarWidgetState();
+}
+
+class _BottomNavBarWidgetState extends State<BottomNavBarWidget> {
+  int _unreadNotificationCount = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadNotificationCount();
+    _startNotificationCountTimer();
+  }
+
+  void _startNotificationCountTimer() {
+    Future.delayed(const Duration(seconds: 30), () {
+      if (mounted) {
+        _loadNotificationCount();
+        _startNotificationCountTimer();
+      }
+    });
+  }
+
+  Future<void> _loadNotificationCount() async {
+    final appState = context.read<AppState>();
+    if (appState.currentUser != null && mounted) {
+      final count = await SupabaseNotificationService().getUnreadCount(
+        appState.currentUser!.id!,
+      );
+      if (mounted) {
+        setState(() {
+          _unreadNotificationCount = count;
+        });
+      }
+    }
+  }
+
+  Widget _buildNotificationIcon(IconData iconData, Color iconColor) {
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        Icon(iconData, size: 24, color: iconColor),
+        if (_unreadNotificationCount > 0)
+          Positioned(
+            right: -4,
+            top: -4,
+            child: Container(
+              width: 8,
+              height: 8,
+              decoration: const BoxDecoration(
+                color: Colors.red,
+                shape: BoxShape.circle,
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
     return NavigationBar(
-      selectedIndex: currentIndex,
+      selectedIndex: widget.currentIndex,
       height: 60,
-      labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
+      labelBehavior: NavigationDestinationLabelBehavior.alwaysHide,
       indicatorColor: Colors.transparent,
-      onDestinationSelected: onDestinationSelected,
+      onDestinationSelected: widget.onDestinationSelected,
       destinations: [
         NavigationDestination(
           icon: Icon(Icons.home_outlined, size: 24, color: Colors.black),
           selectedIcon: Icon(Icons.home, size: 24, color: Colors.orange),
-          label: 'Trang chủ',
+          label: '',
         ),
         NavigationDestination(
-          icon: Icon(Icons.add_circle_outline, size: 24, color: Colors.black),
-          selectedIcon: Icon(Icons.add_circle, size: 24, color: Colors.orange),
-          label: 'Đăng tin',
+          icon: Icon(Icons.people_outlined, size: 24, color: Colors.black),
+          selectedIcon: Icon(Icons.people, size: 24, color: Colors.orange),
+          label: '',
         ),
         NavigationDestination(
-          icon: Icon(Icons.notifications_outlined, size: 24, color: Colors.black),
-          selectedIcon: Icon(Icons.notifications, size: 24, color: Colors.orange),
-          label: 'Thông báo',
+          icon: Image.asset('assets/icons/app_icon.png', width: 43, height: 43),
+          selectedIcon: Image.asset('assets/icons/app_icon.png', width: 43, height: 43),
+          label: '',
+        ),
+        NavigationDestination(
+          icon: _buildNotificationIcon(Icons.notifications_outlined, Colors.black),
+          selectedIcon: _buildNotificationIcon(Icons.notifications, Colors.orange),
+          label: '',
         ),
         NavigationDestination(
           icon: Icon(Icons.person_outline, size: 24, color: Colors.black),
           selectedIcon: Icon(Icons.person, size: 24, color: Colors.orange),
-          label: 'Hồ sơ',
+          label: '',
         ),
       ],
     );

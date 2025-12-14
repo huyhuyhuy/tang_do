@@ -6,7 +6,6 @@ import '../providers/app_state.dart';
 import '../services/supabase_product_service.dart';
 import '../services/supabase_auth_service.dart';
 import '../services/supabase_review_service.dart';
-import '../services/supabase_notification_service.dart';
 import '../models/product.dart';
 import '../models/review.dart';
 import '../models/user.dart';

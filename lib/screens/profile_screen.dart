@@ -6,7 +6,7 @@ import '../providers/app_state.dart';
 import '../services/supabase_product_service.dart';
 import '../services/supabase_auth_service.dart';
 import '../services/supabase_review_service.dart';
-import '../services/supabase_notification_service.dart';
+import '../services/supabase_contact_service.dart';
 import '../models/product.dart';
 import '../models/user.dart';
 import '../utils/constants.dart';
@@ -15,7 +15,6 @@ import '../widgets/banner_ad_widget.dart';
 import '../widgets/bottom_nav_bar_widget.dart';
 import 'product_detail_screen.dart';
 import 'edit_profile_screen.dart';
-import 'add_product_screen.dart';
 import 'edit_product_screen.dart';
 import 'login_screen.dart';
 import 'main_screen.dart';
@@ -40,11 +39,14 @@ class ProfileScreen extends StatefulWidget {
 class ProfileScreenState extends State<ProfileScreen> with AutomaticKeepAliveClientMixin {
   final SupabaseProductService _productService = SupabaseProductService();
   final SupabaseAuthService _authService = SupabaseAuthService();
+  final SupabaseContactService _contactService = SupabaseContactService();
 
   User? _user;
   List<Product> _products = [];
   bool _isLoading = true;
   String _selectedCategory = 'Tất cả';
+  bool _isInContacts = false;
+  bool _isCheckingContact = true;
 
   @override
   bool get wantKeepAlive => true;
@@ -61,6 +63,24 @@ class ProfileScreenState extends State<ProfileScreen> with AutomaticKeepAliveCli
     _user = await _authService.getUserById(widget.userId);
     if (_user != null) {
       _products = await _productService.getProductsByUserId(_user!.id!);
+      
+      // Check if user is in contacts
+      final appState = context.read<AppState>();
+      if (appState.currentUser != null && appState.currentUser!.id != _user!.id) {
+        _isCheckingContact = true;
+        final isContact = await _contactService.isContact(
+          appState.currentUser!.id!,
+          _user!.id!,
+        );
+        setState(() {
+          _isInContacts = isContact;
+          _isCheckingContact = false;
+        });
+      } else {
+        setState(() {
+          _isCheckingContact = false;
+        });
+      }
     }
 
     setState(() => _isLoading = false);
@@ -69,6 +89,35 @@ class ProfileScreenState extends State<ProfileScreen> with AutomaticKeepAliveCli
   // Public method to refresh data from outside
   void refreshProfile() {
     _loadData();
+  }
+
+  Future<void> _saveContact() async {
+    final appState = context.read<AppState>();
+    if (appState.currentUser == null || _user == null) return;
+
+    final success = await _contactService.addContact(
+      appState.currentUser!.id!,
+      _user!.id!,
+    );
+
+    if (success && mounted) {
+      setState(() {
+        _isInContacts = true;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Đã lưu liên hệ thành công'),
+          backgroundColor: Colors.green,
+        ),
+      );
+    } else if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Lưu liên hệ thất bại'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 
   List<Product> get _filteredProducts {
@@ -243,6 +292,28 @@ class ProfileScreenState extends State<ProfileScreen> with AutomaticKeepAliveCli
                         },
                       ),
                     ],
+                    // Save contact button (only for other users' profiles)
+                    if (!isOwnProfile && !_isCheckingContact) ...[
+                      const SizedBox(height: 16),
+                      const Divider(),
+                      const SizedBox(height: 8),
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton.icon(
+                          onPressed: _isInContacts ? null : _saveContact,
+                          icon: Icon(_isInContacts ? Icons.check_circle : Icons.person_add),
+                          label: Text(_isInContacts ? 'Đã lưu liên hệ' : 'Lưu liên hệ'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.orange,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -386,8 +457,9 @@ class ProfileScreenState extends State<ProfileScreen> with AutomaticKeepAliveCli
   }
 
   int _getCurrentTabIndex(BuildContext context) {
-    // ProfileScreen được push từ MainFeedScreen hoặc từ tab Profile, nên tab hiện tại là 3 (Hồ sơ)
-    return 3;
+    // ProfileScreen được push từ MainFeedScreen hoặc từ tab Profile, nên tab hiện tại là 4 (Hồ sơ)
+    // Index mới: 0=Trang chủ, 1=Danh bạ, 2=Đăng tin, 3=Thông báo, 4=Hồ sơ
+    return 4;
   }
 
   void _navigateToTab(BuildContext context, int index) {

@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/app_state.dart';
 import '../widgets/banner_ad_widget.dart';
+import '../services/supabase_notification_service.dart';
 import 'main_feed_screen.dart';
+import 'contacts_screen.dart';
 import 'add_product_screen.dart';
 import 'notifications_screen.dart';
 import 'profile_screen.dart';
@@ -29,17 +31,51 @@ class _MainScreenState extends State<MainScreen> {
   late int _currentIndex;
   final GlobalKey<MainFeedScreenState> _mainFeedKey = GlobalKey<MainFeedScreenState>();
   final GlobalKey<ProfileScreenWrapperState> _profileScreenKey = GlobalKey<ProfileScreenWrapperState>();
+  final SupabaseNotificationService _notificationService = SupabaseNotificationService();
+  int _unreadNotificationCount = 0;
 
   @override
   void initState() {
     super.initState();
     _currentIndex = widget.initialTab ?? 0;
+    _loadNotificationCount();
+    // Refresh notification count periodically
+    _startNotificationCountTimer();
+  }
+
+  void _startNotificationCountTimer() {
+    // Refresh every 30 seconds
+    Future.delayed(const Duration(seconds: 30), () {
+      if (mounted) {
+        _loadNotificationCount();
+        _startNotificationCountTimer();
+      }
+    });
+  }
+
+  Future<void> _loadNotificationCount() async {
+    final appState = context.read<AppState>();
+    if (appState.currentUser != null && mounted) {
+      final count = await _notificationService.getUnreadCount(
+        appState.currentUser!.id!,
+      );
+      if (mounted) {
+        setState(() {
+          _unreadNotificationCount = count;
+        });
+      }
+    }
+  }
+
+  void refreshNotificationCount() {
+    _loadNotificationCount();
   }
 
   late final List<Widget> _screens = [
     MainFeedScreen(key: _mainFeedKey),
+    const ContactsScreen(),
     const AddProductScreenWrapper(),
-    const NotificationsScreen(),
+    NotificationsScreen(onNotificationRead: refreshNotificationCount),
     ProfileScreenWrapper(key: _profileScreenKey),
   ];
 
@@ -63,7 +99,7 @@ class _MainScreenState extends State<MainScreen> {
           NavigationBar(
             selectedIndex: _currentIndex,
             height: 60,
-            labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
+            labelBehavior: NavigationDestinationLabelBehavior.alwaysHide,
             indicatorColor: Colors.transparent,
             onDestinationSelected: (index) {
               setState(() {
@@ -74,35 +110,66 @@ class _MainScreenState extends State<MainScreen> {
                 _mainFeedKey.currentState!.resetSearch();
               }
               // Refresh profile screen khi chuyển về tab Hồ sơ
-              if (index == 3 && _profileScreenKey.currentState != null) {
+              if (index == 4 && _profileScreenKey.currentState != null) {
                 _profileScreenKey.currentState!.refreshProfile();
+              }
+              // Refresh notification count khi chuyển về tab Thông báo
+              if (index == 3) {
+                _loadNotificationCount();
               }
             },
             destinations: [
               NavigationDestination(
                 icon: Icon(Icons.home_outlined, size: 24, color: Colors.black),
                 selectedIcon: Icon(Icons.home, size: 24, color: Colors.orange),
-                label: 'Trang chủ',
+                label: '',
               ),
               NavigationDestination(
-                icon: Icon(Icons.add_circle_outline, size: 24, color: Colors.black),
-                selectedIcon: Icon(Icons.add_circle, size: 24, color: Colors.orange),
-                label: 'Đăng tin',
+                icon: Icon(Icons.people_outlined, size: 24, color: Colors.black),
+                selectedIcon: Icon(Icons.people, size: 24, color: Colors.orange),
+                label: '',
               ),
               NavigationDestination(
-                icon: Icon(Icons.notifications_outlined, size: 24, color: Colors.black),
-                selectedIcon: Icon(Icons.notifications, size: 24, color: Colors.orange),
-                label: 'Thông báo',
+                icon: Image.asset('assets/icons/app_icon.png', width: 43, height: 43),
+                selectedIcon: Image.asset('assets/icons/app_icon.png', width: 43, height: 43),
+                label: '',
+              ),
+              NavigationDestination(
+                icon: _buildNotificationIcon(Icons.notifications_outlined, Colors.black),
+                selectedIcon: _buildNotificationIcon(Icons.notifications, Colors.orange),
+                label: '',
               ),
               NavigationDestination(
                 icon: Icon(Icons.person_outline, size: 24, color: Colors.black),
                 selectedIcon: Icon(Icons.person, size: 24, color: Colors.orange),
-                label: 'Hồ sơ',
+                label: '',
               ),
             ],
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildNotificationIcon(IconData iconData, Color iconColor) {
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        Icon(iconData, size: 24, color: iconColor),
+        if (_unreadNotificationCount > 0)
+          Positioned(
+            right: -4,
+            top: -4,
+            child: Container(
+              width: 8,
+              height: 8,
+              decoration: const BoxDecoration(
+                color: Colors.red,
+                shape: BoxShape.circle,
+              ),
+            ),
+          ),
+      ],
     );
   }
 }
@@ -167,4 +234,5 @@ class ProfileScreenWrapperState extends State<ProfileScreenWrapper> {
       },
     );
   }
+
 }

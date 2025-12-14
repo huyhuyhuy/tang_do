@@ -6,7 +6,9 @@ import '../widgets/banner_ad_widget.dart';
 import '../models/notification.dart' as models;
 
 class NotificationsScreen extends StatefulWidget {
-  const NotificationsScreen({super.key});
+  final VoidCallback? onNotificationRead;
+  
+  const NotificationsScreen({super.key, this.onNotificationRead});
 
   @override
   State<NotificationsScreen> createState() => _NotificationsScreenState();
@@ -41,10 +43,8 @@ class _NotificationsScreenState extends State<NotificationsScreen> with Automati
   Future<void> _markAsRead(String notificationId) async {
     await _notificationService.markAsRead(notificationId);
     _loadNotifications();
-    final appState = context.read<AppState>();
-    if (appState.currentUser != null) {
-      // Refresh unread count in app state if needed
-    }
+    // Refresh notification count in MainScreen
+    widget.onNotificationRead?.call();
   }
 
   Future<void> _markAllAsRead() async {
@@ -52,6 +52,8 @@ class _NotificationsScreenState extends State<NotificationsScreen> with Automati
     if (appState.currentUser != null) {
       await _notificationService.markAllAsRead(appState.currentUser!.id!);
       _loadNotifications();
+      // Refresh notification count in MainScreen
+      widget.onNotificationRead?.call();
     }
   }
 
