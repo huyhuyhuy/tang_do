@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -10,19 +11,24 @@ class InterstitialAdService {
   static const String _androidAdUnitId = 'ca-app-pub-4969810842586372/7842325400';
   static const String _iosAdUnitId = 'ca-app-pub-4969810842586372/5026134966';
   
+  // Test Ad Unit IDs (for development)
+  static const String _androidTestAdUnitId = 'ca-app-pub-3940256099942544/1033173712';
+  static const String _iosTestAdUnitId = 'ca-app-pub-3940256099942544/4411468910';
+  
   // SharedPreferences keys
   static const String _keyLastAdShownTime = 'last_interstitial_ad_shown_time';
   static const String _keyFirstLoginAdShown = 'first_login_ad_shown';
   static const Duration _adInterval = Duration(hours: 4);
 
   /// Get ad unit ID based on platform
+  /// Use test IDs in debug mode, real IDs in release mode
   static String get _adUnitId {
     if (Platform.isAndroid) {
-      return _androidAdUnitId;
+      return kDebugMode ? _androidTestAdUnitId : _androidAdUnitId;
     } else if (Platform.isIOS) {
-      return _iosAdUnitId;
+      return kDebugMode ? _iosTestAdUnitId : _iosAdUnitId;
     } else {
-      return _androidAdUnitId; // Default to Android
+      return kDebugMode ? _androidTestAdUnitId : _androidAdUnitId; // Default to Android
     }
   }
 
