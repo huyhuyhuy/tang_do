@@ -47,7 +47,7 @@ class SupabaseContactService {
     }
   }
 
-  /// Check if a user is in contacts
+  /// Check if a user is in contacts or not
   Future<bool> isContact(String userId, String contactUserId) async {
     try {
       final response = await _supabase

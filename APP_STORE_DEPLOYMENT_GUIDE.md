@@ -383,6 +383,13 @@ Sau khi Archive xong, cửa sổ **Organizer** sẽ tự động mở:
    - Quá trình này mất 5-15 phút tùy tốc độ mạng
    - Bạn sẽ thấy progress bar
 
+chú ý sửa tên:
+Trong dialog "Upload for App Store Connect", bạn thấy:
+Name: "Runner" → cần đổi thành "TangDo"
+SKU: "com.tangdo.tangDo" → đúng
+Primary Language: "Vietnamese" → đúng
+Bundle Identifier: "com.tangdo.tangDo" → đúng
+
 ### Bước 9.4: Kiểm tra upload thành công
 
 1. Sau khi upload xong, bạn sẽ thấy thông báo **"Upload Successful"**
@@ -540,7 +547,8 @@ Bạn đang ở trang **"iOS App Version 1.0"** trong App Store Connect. Điền
 
 **Vị trí:** Phần thứ hai, có tiêu đề "Promotional Text"
 
-**Mục đích:** Text này sẽ hiển thị ngay dưới app name trên App Store, dùng để quảng bá tính năng mới hoặc khuyến mãi.
+**Mục đích:** Text này sẽ hiển thị ngay dưới app name trên App Store, 
+dùng để quảng bá tính năng mới hoặc khuyến mãi.
 
 **Yêu cầu:**
 - Tối đa **170 ký tự**
