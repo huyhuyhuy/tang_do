@@ -47,5 +47,9 @@
 	<true/>
 	<key>GADApplicationIdentifier</key>
 	<string>ca-app-pub-4969810842586372~3872835394</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Ứng dụng cần truy cập camera để bạn có thể chụp ảnh avatar và ảnh sản phẩm</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Ứng dụng cần truy cập thư viện ảnh để bạn có thể chọn ảnh avatar và ảnh sản phẩm từ thiết bị</string>
 </dict>
 </plist>

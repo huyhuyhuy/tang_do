@@ -63,6 +63,8 @@ class _AddProductScreenState extends State<AddProductScreen> with AutomaticKeepA
   }
 
   Future<void> _pickImage(int index) async {
+    if (!mounted) return;
+    
     try {
       // Show dialog to choose camera or gallery
       final ImageSource? source = await showDialog<ImageSource>(
@@ -87,16 +89,38 @@ class _AddProductScreenState extends State<AddProductScreen> with AutomaticKeepA
         ),
       );
       
-      if (source == null) return;
+      if (source == null || !mounted) return;
+      
+      // Wait a bit for dialog to close completely
+      await Future.delayed(const Duration(milliseconds: 300));
+      
+      if (!mounted) return;
       
       final XFile? image = await _imagePicker.pickImage(
         source: source,
         imageQuality: 85,
         maxWidth: 1920,
         maxHeight: 1920,
-      );
+      ).catchError((error) {
+        print('Image picker error: $error');
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Lỗi khi chọn ảnh: ${error.toString()}'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+        return null;
+      });
       
       if (image != null && mounted) {
+        // Verify file exists before copying
+        final sourceFile = File(image.path);
+        if (!await sourceFile.exists()) {
+          throw Exception('File ảnh không tồn tại');
+        }
+        
         // Copy image to app directory
         final appDir = await getApplicationDocumentsDirectory();
         final imageDir = Directory(path.join(appDir.path, 'product_images'));
@@ -104,12 +128,17 @@ class _AddProductScreenState extends State<AddProductScreen> with AutomaticKeepA
           await imageDir.create(recursive: true);
         }
         final fileName = '${DateTime.now().millisecondsSinceEpoch}_${path.basename(image.path)}';
-        final savedImage = await File(image.path).copy(
+        final savedImage = await sourceFile.copy(
           path.join(imageDir.path, fileName),
         );
         
-        // Wait a bit for UI to stabilize after camera closes
-        await Future.delayed(const Duration(milliseconds: 100));
+        // Verify copied file exists
+        if (!await savedImage.exists()) {
+          throw Exception('Không thể lưu file ảnh');
+        }
+        
+        // Wait a bit for UI to stabilize after camera/gallery closes
+        await Future.delayed(const Duration(milliseconds: 200));
         
         if (mounted) {
           setState(() {
@@ -118,10 +147,11 @@ class _AddProductScreenState extends State<AddProductScreen> with AutomaticKeepA
         }
       }
     } catch (e) {
+      print('Product image pick error: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Lỗi khi chọn ảnh: $e'),
+            content: Text('Lỗi khi chọn ảnh: ${e.toString()}'),
             backgroundColor: Colors.red,
           ),
         );

@@ -65,6 +65,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   }
 
   Future<void> _pickAvatar() async {
+    if (!mounted) return;
+    
     try {
       // Show dialog to choose camera or gallery
       final ImageSource? source = await showDialog<ImageSource>(
@@ -89,32 +91,54 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         ),
       );
       
-      if (source == null) return;
+      if (source == null || !mounted) return;
+      
+      // Wait a bit for dialog to close completely
+      await Future.delayed(const Duration(milliseconds: 300));
+      
+      if (!mounted) return;
       
       final XFile? image = await _imagePicker.pickImage(
         source: source,
         imageQuality: 85,
         maxWidth: 512,
         maxHeight: 512,
-      );
+      ).catchError((error) {
+        print('Image picker error: $error');
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Lỗi khi chọn ảnh: ${error.toString()}'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+        return null;
+      });
       
       if (image != null && mounted) {
-        // Wait a bit for UI to stabilize after camera closes
-        await Future.delayed(const Duration(milliseconds: 100));
+        // Wait a bit for UI to stabilize after camera/gallery closes
+        await Future.delayed(const Duration(milliseconds: 200));
         
         if (mounted) {
-          // Save as File for preview and later upload
-          setState(() {
-            _avatarFile = File(image.path);
-            _avatarRemoved = false; // Reset removed flag when new image is selected
-          });
+          // Verify file exists
+          final file = File(image.path);
+          if (await file.exists()) {
+            setState(() {
+              _avatarFile = file;
+              _avatarRemoved = false; // Reset removed flag when new image is selected
+            });
+          } else {
+            throw Exception('File không tồn tại');
+          }
         }
       }
     } catch (e) {
+      print('Avatar pick error: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Lỗi khi chọn ảnh: $e'),
+            content: Text('Lỗi khi chọn ảnh: ${e.toString()}'),
             backgroundColor: Colors.red,
           ),
         );

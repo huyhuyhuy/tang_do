@@ -192,6 +192,112 @@ class ProfileScreenState extends State<ProfileScreen> with AutomaticKeepAliveCli
                           (route) => false,
                         );
                       }
+                    } else if (value == 'delete_account') {
+                      // Show warning dialog first
+                      final confirm1 = await showDialog<bool>(
+                        context: context,
+                        builder: (context) => AlertDialog(
+                          title: const Text('Xóa tài khoản'),
+                          content: const Text(
+                            'Bạn có chắc chắn muốn xóa tài khoản? Hành động này không thể hoàn tác.\n\n'
+                            'Tất cả dữ liệu của bạn sẽ bị xóa vĩnh viễn, bao gồm:\n'
+                            '• Tất cả sản phẩm đã đăng\n'
+                            '• Tất cả đánh giá và nhận xét\n'
+                            '• Thông tin liên hệ\n'
+                            '• Ảnh đại diện và ảnh sản phẩm',
+                          ),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(context, false),
+                              child: const Text('Hủy'),
+                            ),
+                            ElevatedButton(
+                              onPressed: () => Navigator.pop(context, true),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.red,
+                                foregroundColor: Colors.white,
+                              ),
+                              child: const Text('Tiếp tục'),
+                            ),
+                          ],
+                        ),
+                      );
+                      
+                      if (confirm1 != true || !mounted) return;
+                      
+                      // Second confirmation
+                      final confirm2 = await showDialog<bool>(
+                        context: context,
+                        builder: (context) => AlertDialog(
+                          title: const Text('Xác nhận xóa tài khoản'),
+                          content: const Text(
+                            'Lần cuối xác nhận: Bạn có chắc chắn muốn xóa tài khoản vĩnh viễn?',
+                            style: TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(context, false),
+                              child: const Text('Hủy'),
+                            ),
+                            ElevatedButton(
+                              onPressed: () => Navigator.pop(context, true),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.red,
+                                foregroundColor: Colors.white,
+                              ),
+                              child: const Text('Xóa tài khoản'),
+                            ),
+                          ],
+                        ),
+                      );
+                      
+                      if (confirm2 == true && mounted && appState.currentUser?.id != null) {
+                        // Show loading dialog
+                        showDialog(
+                          context: context,
+                          barrierDismissible: false,
+                          builder: (context) => const AlertDialog(
+                            content: Row(
+                              children: [
+                                CircularProgressIndicator(),
+                                SizedBox(width: 16),
+                                Text('Đang xóa tài khoản...'),
+                              ],
+                            ),
+                          ),
+                        );
+                        
+                        final success = await _authService.deleteAccount(appState.currentUser!.id!);
+                        
+                        if (!mounted) return;
+                        Navigator.of(context).pop(); // Close loading dialog
+                        
+                        if (success) {
+                          // Logout and navigate to login
+                          await appState.logout();
+                          if (mounted) {
+                            Navigator.of(context).pushAndRemoveUntil(
+                              MaterialPageRoute(builder: (_) => const LoginScreen()),
+                              (route) => false,
+                            );
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Tài khoản đã được xóa thành công'),
+                                backgroundColor: Colors.green,
+                              ),
+                            );
+                          }
+                        } else {
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Lỗi khi xóa tài khoản. Vui lòng thử lại.'),
+                                backgroundColor: Colors.red,
+                              ),
+                            );
+                          }
+                        }
+                      }
                     }
                   },
                   itemBuilder: (context) => [
@@ -199,9 +305,19 @@ class ProfileScreenState extends State<ProfileScreen> with AutomaticKeepAliveCli
                       value: 'logout',
                       child: Row(
                         children: [
-                          Icon(Icons.logout, color: Colors.red),
+                          Icon(Icons.logout, color: Colors.grey),
                           SizedBox(width: 8),
-                          Text('Đăng xuất', style: TextStyle(color: Colors.red)),
+                          Text('Đăng xuất'),
+                        ],
+                      ),
+                    ),
+                    const PopupMenuItem(
+                      value: 'delete_account',
+                      child: Row(
+                        children: [
+                          Icon(Icons.delete_forever, color: Colors.red),
+                          SizedBox(width: 8),
+                          Text('Xóa tài khoản', style: TextStyle(color: Colors.red)),
                         ],
                       ),
                     ),

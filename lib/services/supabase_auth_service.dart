@@ -1,5 +1,6 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/user.dart' as models;
+import 'supabase_storage_service.dart';
 
 class SupabaseAuthService {
   final SupabaseClient _supabase = Supabase.instance.client;
@@ -146,5 +147,96 @@ class SupabaseAuthService {
   Future<void> logout() async {
     // No Supabase Auth session to sign out
     // Just clear local state
+  }
+
+  /// Delete user account and all related data
+  /// This permanently deletes the user account and all associated data
+  Future<bool> deleteAccount(String userId) async {
+    try {
+      // Get user data first to delete avatar
+      final userResponse = await _supabase
+          .from('users')
+          .select('avatar_url')
+          .eq('id', userId)
+          .maybeSingle();
+      
+      // Delete avatar image from storage if exists
+      if (userResponse != null && userResponse['avatar_url'] != null) {
+        final avatarUrl = userResponse['avatar_url'] as String;
+        if (avatarUrl.isNotEmpty && avatarUrl.startsWith('http')) {
+          try {
+            final storageService = SupabaseStorageService();
+            await storageService.deleteAvatarImage(avatarUrl);
+          } catch (e) {
+            print('Error deleting avatar: $e');
+            // Continue with account deletion even if avatar deletion fails
+          }
+        }
+      }
+      
+      // Delete all product images for user's products
+      try {
+        final productsResponse = await _supabase
+            .from('products')
+            .select('image1_url, image2_url, image3_url')
+            .eq('user_id', userId);
+        
+        final storageService = SupabaseStorageService();
+        for (final product in productsResponse as List) {
+          // Delete each image if it exists
+          for (final imageKey in ['image1_url', 'image2_url', 'image3_url']) {
+            final imageUrl = product[imageKey] as String?;
+            if (imageUrl != null && imageUrl.isNotEmpty && imageUrl.startsWith('http')) {
+              try {
+                await storageService.deleteProductImage(imageUrl);
+              } catch (e) {
+                print('Error deleting product image: $e');
+                // Continue even if image deletion fails
+              }
+            }
+          }
+        }
+      } catch (e) {
+        print('Error deleting product images: $e');
+        // Continue with account deletion
+      }
+      
+      // Delete notifications where user is the recipient
+      try {
+        await _supabase
+            .from('notifications')
+            .delete()
+            .eq('user_id', userId);
+      } catch (e) {
+        print('Error deleting notifications: $e');
+        // Continue with account deletion
+      }
+      
+      // Delete contacts where user is either the owner or the contact
+      try {
+        await _supabase
+            .from('contacts')
+            .delete()
+            .or('user_id.eq.$userId,contact_user_id.eq.$userId');
+      } catch (e) {
+        print('Error deleting contacts: $e');
+        // Continue with account deletion
+      }
+      
+      // Note: Products, Reviews, and Follows will be automatically deleted
+      // due to ON DELETE CASCADE constraints in the database
+      
+      // Finally, delete the user record itself
+      // This will cascade delete products, reviews, and follows
+      await _supabase
+          .from('users')
+          .delete()
+          .eq('id', userId);
+      
+      return true;
+    } catch (e) {
+      print('Delete account error: $e');
+      return false;
+    }
   }
 }
