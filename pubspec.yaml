@@ -2,7 +2,7 @@ name: tang_do
 description: "App Tặng đồ - Ứng dụng tặng, chia sẻ đồ cũ"
 publish_to: 'none'
 
-version: 1.0.4+5
+version: 1.0.5+6
 
 environment:
   sdk: ^3.9.0

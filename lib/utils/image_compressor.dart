@@ -40,7 +40,7 @@ class ImageCompressor {
         'compressed_$timestamp$extension',
       );
 
-      // Compress image
+      // Compress image (enhanced compression)
       final compressedXFile = await FlutterImageCompress.compressAndGetFile(
         imageFile.absolute.path,
         targetPath,
