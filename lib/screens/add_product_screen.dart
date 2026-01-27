@@ -9,6 +9,7 @@ import '../services/supabase_product_service.dart';
 import '../services/supabase_storage_service.dart';
 import '../models/product.dart';
 import '../utils/constants.dart';
+import '../utils/content_filter.dart';
 import '../utils/vietnam_addresses.dart';
 import '../widgets/banner_ad_widget.dart';
 import '../widgets/searchable_address_dropdown.dart';
@@ -182,6 +183,17 @@ class _AddProductScreenState extends State<AddProductScreen> with AutomaticKeepA
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Vui lòng thêm ít nhất 1 ảnh sản phẩm'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    // Content filter: no objectionable content (Guideline 1.2)
+    if (containsBannedContent(_nameController.text) || containsBannedContent(_descriptionController.text)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(getBannedContentMessage()),
           backgroundColor: Colors.red,
         ),
       );

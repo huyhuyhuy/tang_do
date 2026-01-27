@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../providers/app_state.dart';
 import '../services/supabase_auth_service.dart';
+import '../utils/constants.dart';
 import 'main_screen.dart';
 
 class RegisterScreen extends StatefulWidget {
@@ -22,6 +24,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   bool _isLoading = false;
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
+  bool _agreedToTerms = false;
   final SupabaseAuthService _authService = SupabaseAuthService();
 
   @override
@@ -36,6 +39,15 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   Future<void> _handleRegister() async {
     if (!_formKey.currentState!.validate()) return;
+    if (!_agreedToTerms) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Bạn cần đồng ý với Điều khoản sử dụng và Quy định cộng đồng để đăng ký'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
 
     setState(() => _isLoading = true);
 
@@ -218,7 +230,63 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     return null;
                   },
                 ),
-                const SizedBox(height: 32),
+                const SizedBox(height: 16),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    SizedBox(
+                      width: 24,
+                      height: 24,
+                      child: Checkbox(
+                        value: _agreedToTerms,
+                        onChanged: (v) => setState(() => _agreedToTerms = v ?? false),
+                        activeColor: Colors.orange,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: RichText(
+                        text: TextSpan(
+                          style: TextStyle(fontSize: 13, color: Theme.of(context).textTheme.bodyMedium?.color),
+                          children: [
+                            const TextSpan(text: 'Tôi đồng ý với '),
+                            WidgetSpan(
+                              alignment: PlaceholderAlignment.baseline,
+                              baseline: TextBaseline.alphabetic,
+                              child: GestureDetector(
+                                onTap: () async {
+                                  final uri = Uri.parse(AppConstants.termsUrl);
+                                  if (await canLaunchUrl(uri)) await launchUrl(uri, mode: LaunchMode.externalApplication);
+                                },
+                                child: const Text(
+                                  'Điều khoản sử dụng',
+                                  style: TextStyle(color: Colors.orange, decoration: TextDecoration.underline, fontSize: 13),
+                                ),
+                              ),
+                            ),
+                            const TextSpan(text: ' và '),
+                            WidgetSpan(
+                              alignment: PlaceholderAlignment.baseline,
+                              baseline: TextBaseline.alphabetic,
+                              child: GestureDetector(
+                                onTap: () async {
+                                  final uri = Uri.parse(AppConstants.termsUrl);
+                                  if (await canLaunchUrl(uri)) await launchUrl(uri, mode: LaunchMode.externalApplication);
+                                },
+                                child: const Text(
+                                  'Quy định cộng đồng',
+                                  style: TextStyle(color: Colors.orange, decoration: TextDecoration.underline, fontSize: 13),
+                                ),
+                              ),
+                            ),
+                            const TextSpan(text: '. Ứng dụng không dung thứ nội dung phản cảm hoặc người dùng có hành vi lạm dụng.'),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 24),
                 ElevatedButton(
                   onPressed: _isLoading ? null : _handleRegister,
                   style: ElevatedButton.styleFrom(

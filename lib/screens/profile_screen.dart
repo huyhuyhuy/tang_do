@@ -7,6 +7,8 @@ import '../services/supabase_product_service.dart';
 import '../services/supabase_auth_service.dart';
 import '../services/supabase_review_service.dart';
 import '../services/supabase_contact_service.dart';
+import '../services/supabase_report_service.dart';
+import '../services/supabase_block_service.dart';
 import '../models/product.dart';
 import '../models/user.dart';
 import '../utils/constants.dart';
@@ -40,6 +42,8 @@ class ProfileScreenState extends State<ProfileScreen> with AutomaticKeepAliveCli
   final SupabaseProductService _productService = SupabaseProductService();
   final SupabaseAuthService _authService = SupabaseAuthService();
   final SupabaseContactService _contactService = SupabaseContactService();
+  final SupabaseReportService _reportService = SupabaseReportService();
+  final SupabaseBlockService _blockService = SupabaseBlockService();
 
   User? _user;
   List<Product> _products = [];
@@ -117,6 +121,81 @@ class ProfileScreenState extends State<ProfileScreen> with AutomaticKeepAliveCli
           backgroundColor: Colors.red,
         ),
       );
+    }
+  }
+
+  Future<void> _showReportUserDialog(BuildContext context, AppState appState) async {
+    if (appState.currentUser == null || _user == null) return;
+    String? reason = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Báo cáo người dùng'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: SupabaseReportService.reportReasons
+                .map((r) => ListTile(
+                      title: Text(r['label']!),
+                      onTap: () => Navigator.pop(ctx, r['code']),
+                    ))
+                .toList(),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Hủy'),
+          ),
+        ],
+      ),
+    );
+    if (reason == null || !mounted) return;
+    final ok = await _reportService.reportContent(
+      reporterId: appState.currentUser!.id!,
+      contentType: 'user',
+      contentId: _user!.id!,
+      reportedUserId: _user!.id!,
+      reason: reason,
+    );
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(ok ? 'Đã gửi báo cáo. Chúng tôi sẽ xem xét trong vòng 24 giờ.' : 'Gửi báo cáo thất bại.'),
+          backgroundColor: ok ? Colors.green : Colors.red,
+        ),
+      );
+    }
+  }
+
+  Future<void> _blockUserAndPop(BuildContext context, AppState appState) async {
+    if (appState.currentUser == null || _user == null) return;
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Chặn người dùng'),
+        content: Text(
+          'Bạn có chắc chặn ${_user!.nickname}? Bạn sẽ không thấy sản phẩm của người này nữa.',
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Hủy')),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
+            child: const Text('Chặn'),
+          ),
+        ],
+      ),
+    );
+    if (confirm != true || !mounted) return;
+    final ok = await _blockService.blockUser(appState.currentUser!.id!, _user!.id!);
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(ok ? 'Đã chặn ${_user!.nickname}' : 'Chặn thất bại'),
+          backgroundColor: ok ? Colors.green : Colors.red,
+        ),
+      );
+      if (ok) Navigator.of(context).pop(true);
     }
   }
 
@@ -324,7 +403,40 @@ class ProfileScreenState extends State<ProfileScreen> with AutomaticKeepAliveCli
                   ],
                 ),
               ]
-            : null,
+            : [
+                PopupMenuButton<String>(
+                  icon: const Icon(Icons.more_vert),
+                  onSelected: (value) async {
+                    if (value == 'report_user') {
+                      await _showReportUserDialog(context, appState);
+                    } else if (value == 'block_user') {
+                      await _blockUserAndPop(context, appState);
+                    }
+                  },
+                  itemBuilder: (context) => [
+                    const PopupMenuItem(
+                      value: 'report_user',
+                      child: Row(
+                        children: [
+                          Icon(Icons.flag_outlined, size: 20),
+                          SizedBox(width: 8),
+                          Text('Báo cáo người dùng'),
+                        ],
+                      ),
+                    ),
+                    PopupMenuItem(
+                      value: 'block_user',
+                      child: Row(
+                        children: [
+                          const Icon(Icons.block, size: 20, color: Colors.red),
+                          const SizedBox(width: 8),
+                          Text('Chặn ${_user!.nickname}', style: const TextStyle(color: Colors.red)),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ],
       ),
       body: SingleChildScrollView(
         child: Column(

@@ -12,6 +12,8 @@ import '../models/user.dart';
 import '../widgets/banner_ad_widget.dart';
 import '../widgets/bottom_nav_bar_widget.dart';
 import '../utils/contact_utils.dart';
+import '../services/supabase_report_service.dart';
+import '../services/supabase_block_service.dart';
 import 'profile_screen.dart';
 import 'add_review_screen.dart';
 import 'main_screen.dart';
@@ -29,6 +31,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   final SupabaseProductService _productService = SupabaseProductService();
   final SupabaseAuthService _authService = SupabaseAuthService();
   final SupabaseReviewService _reviewService = SupabaseReviewService();
+  final SupabaseReportService _reportService = SupabaseReportService();
+  final SupabaseBlockService _blockService = SupabaseBlockService();
   
   Product? _product;
   User? _owner;
@@ -55,6 +59,83 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     setState(() => _isLoading = false);
   }
 
+  Future<void> _showReportProductDialog(BuildContext context) async {
+    final appState = context.read<AppState>();
+    if (appState.currentUser == null || _product == null || _owner == null) return;
+    String? reason = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Báo cáo sản phẩm'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: SupabaseReportService.reportReasons
+                .map((r) => ListTile(
+                      title: Text(r['label']!),
+                      onTap: () => Navigator.pop(ctx, r['code']),
+                    ))
+                .toList(),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Hủy'),
+          ),
+        ],
+      ),
+    );
+    if (reason == null || !mounted) return;
+    final ok = await _reportService.reportContent(
+      reporterId: appState.currentUser!.id!,
+      contentType: 'product',
+      contentId: _product!.id!,
+      reportedUserId: _owner!.id!,
+      reason: reason,
+    );
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(ok ? 'Đã gửi báo cáo. Chúng tôi sẽ xem xét trong vòng 24 giờ.' : 'Gửi báo cáo thất bại.'),
+          backgroundColor: ok ? Colors.green : Colors.red,
+        ),
+      );
+    }
+  }
+
+  Future<void> _blockOwnerAndPop(BuildContext context) async {
+    final appState = context.read<AppState>();
+    if (appState.currentUser == null || _owner == null) return;
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Chặn người dùng'),
+        content: Text(
+          'Bạn có chắc chặn ${_owner!.nickname}? Bạn sẽ không thấy sản phẩm của người này nữa.',
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Hủy')),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
+            child: const Text('Chặn'),
+          ),
+        ],
+      ),
+    );
+    if (confirm != true || !mounted) return;
+    final ok = await _blockService.blockUser(appState.currentUser!.id!, _owner!.id!);
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(ok ? 'Đã chặn ${_owner!.nickname}' : 'Chặn thất bại'),
+          backgroundColor: ok ? Colors.green : Colors.red,
+        ),
+      );
+      if (ok) Navigator.of(context).pop(true); // pop with true so feed can refresh
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_isLoading || _product == null) {
@@ -64,9 +145,48 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       );
     }
 
+    final appState = context.watch<AppState>();
+    final isOwnProduct = appState.currentUser?.id == _owner?.id;
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Chi tiết sản phẩm'),
+        actions: !isOwnProduct && appState.currentUser != null && _owner != null
+            ? [
+                PopupMenuButton<String>(
+                  icon: const Icon(Icons.more_vert),
+                  onSelected: (value) async {
+                    if (value == 'report_product') {
+                      await _showReportProductDialog(context);
+                    } else if (value == 'block_user') {
+                      await _blockOwnerAndPop(context);
+                    }
+                  },
+                  itemBuilder: (context) => [
+                    const PopupMenuItem(
+                      value: 'report_product',
+                      child: Row(
+                        children: [
+                          Icon(Icons.flag_outlined, size: 20),
+                          SizedBox(width: 8),
+                          Text('Báo cáo sản phẩm'),
+                        ],
+                      ),
+                    ),
+                    PopupMenuItem(
+                      value: 'block_user',
+                      child: Row(
+                        children: [
+                          const Icon(Icons.block, size: 20, color: Colors.red),
+                          const SizedBox(width: 8),
+                          Text('Chặn ${_owner!.nickname}', style: const TextStyle(color: Colors.red)),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ]
+            : null,
       ),
       body: SingleChildScrollView(
         child: Column(
@@ -194,11 +314,12 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                     const Divider(),
                     InkWell(
                       onTap: () {
-                        Navigator.of(context).push(
+                        final blocked = await Navigator.of(context).push<bool>(
                           MaterialPageRoute(
-                            builder: (_) => ProfileScreen(userId: _owner!.id!),
+                            builder: (_) => ProfileScreen(userId: _owner!.id!, isOwnProfile: false, showBottomNavBar: false),
                           ),
                         );
+                        if (blocked == true && mounted) Navigator.of(context).pop(true);
                       },
                       child: Row(
                         children: [

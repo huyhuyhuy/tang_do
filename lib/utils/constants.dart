@@ -1,4 +1,14 @@
 class AppConstants {
+  // Support & Legal URLs (must be valid for App Store)
+  static const String supportUrl = 'https://sites.google.com/view/tangdo/home';
+  static const String termsUrl = 'https://sites.google.com/view/tangdo/terms';
+
+  // Banned words for content filtering (objectionable content)
+  static const List<String> bannedWords = [
+    // Add words to filter - keep minimal, expand as needed
+    'lừa đảo', 'scam', 'spam',
+  ];
+
   // Product Categories
   static const List<String> categories = [
     'Đồ điện tử',

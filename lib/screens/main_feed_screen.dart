@@ -6,6 +6,7 @@ import '../providers/app_state.dart';
 import '../services/supabase_product_service.dart';
 import '../services/supabase_notification_service.dart';
 import '../services/supabase_review_service.dart';
+import '../services/supabase_block_service.dart';
 import '../models/product.dart';
 import '../utils/constants.dart';
 import '../utils/vietnam_addresses.dart';
@@ -43,6 +44,7 @@ class MainFeedScreenState extends State<MainFeedScreen> with AutomaticKeepAliveC
   }
   final SupabaseProductService _productService = SupabaseProductService();
   final SupabaseNotificationService _notificationService = SupabaseNotificationService();
+  final SupabaseBlockService _blockService = SupabaseBlockService();
   List<Product> _filteredProducts = [];
   bool _isLoading = true;
   String _searchQuery = '';
@@ -97,12 +99,24 @@ class MainFeedScreenState extends State<MainFeedScreen> with AutomaticKeepAliveC
         condition: _selectedCondition,
         searchQuery: _searchQuery.isEmpty ? null : _searchQuery,
       );
-      setState(() {
-        _filteredProducts = products;
-        _isLoading = false;
-      });
+      // Filter out products from blocked users (Guideline 1.2 – remove from feed instantly)
+      final appState = context.read<AppState>();
+      List<Product> visible = products;
+      if (appState.currentUser != null) {
+        final blockedIds = await _blockService.getBlockedUserIds(appState.currentUser!.id!);
+        if (blockedIds.isNotEmpty) {
+          final blockedSet = blockedIds.toSet();
+          visible = products.where((p) => !blockedSet.contains(p.userId)).toList();
+        }
+      }
+      if (mounted) {
+        setState(() {
+          _filteredProducts = visible;
+          _isLoading = false;
+        });
+      }
     } catch (e) {
-      setState(() => _isLoading = false);
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -250,11 +264,12 @@ class MainFeedScreenState extends State<MainFeedScreen> with AutomaticKeepAliveC
                             _filteredProducts[index].id!,
                           );
                           if (product != null && mounted) {
-                            Navigator.of(context).push(
+                            final popped = await Navigator.of(context).push<bool>(
                               MaterialPageRoute(
                                 builder: (_) => ProductDetailScreen(product: product),
                               ),
                             );
+                            if (popped == true && mounted) refreshProducts();
                           }
                         },
                       );
