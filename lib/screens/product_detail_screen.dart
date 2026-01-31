@@ -313,7 +313,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                   if (_owner != null) ...[
                     const Divider(),
                     InkWell(
-                      onTap: () {
+                      onTap: () async {
                         final blocked = await Navigator.of(context).push<bool>(
                           MaterialPageRoute(
                             builder: (_) => ProfileScreen(userId: _owner!.id!, isOwnProfile: false, showBottomNavBar: false),
